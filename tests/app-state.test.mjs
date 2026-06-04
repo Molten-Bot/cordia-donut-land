@@ -6,6 +6,7 @@ import {
   collectItem,
   createCityItems,
   createDefaultState,
+  gameplayLaneY,
   getHoleRadius,
   itemsPerLevel,
   levels,
@@ -85,6 +86,13 @@ test("city items graduate in size and never exceed maximum hole size", () => {
   assert.ok(items.every((item) => item.width <= item.radius * 2 && item.height <= item.radius * 2));
   assert.ok(items.slice(0, 6).some((item) => ["trash", "shoe", "can", "pet"].includes(item.kind)));
   assert.ok(items.some((item) => ["store", "house", "tower"].includes(item.kind)));
+});
+
+test("starter items spawn on the hole lane so they are reachable", () => {
+  const starterItems = createCityItems().slice(0, itemsPerLevel);
+
+  assert.ok(starterItems.every((item) => item.y === gameplayLaneY));
+  assert.ok(starterItems.every((item) => item.radius <= startHoleRadius));
 });
 
 test("resetRun preserves best score and quiet mode", () => {

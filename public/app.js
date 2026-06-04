@@ -6,6 +6,7 @@ export const maxLevel = 10;
 export const itemsPerLevel = 5;
 export const startHoleRadius = 20;
 export const growthPerItem = 4;
+export const gameplayLaneY = 0.74;
 export const levels = Array.from({ length: maxLevel }, (_, index) => {
     const id = index + 1;
     const minRadius = startHoleRadius + index * itemsPerLevel * growthPerItem;
@@ -174,7 +175,7 @@ export function createCityItems() {
             const graduatedRadius = level.minRadius * 0.42 + offset * 2.6 + levelIndex * 1.8;
             const radius = Math.min(Math.max(7, graduatedRadius), level.maxRadius - 2, maxHoleRadius);
             const lane = offset % 3;
-            items.push(makeItem(id, sectionStart + offset * 74 + (lane === 1 ? 18 : 0), 0.58 + lane * 0.12, radius));
+            items.push(makeItem(id, sectionStart + offset * 74 + (lane === 1 ? 18 : 0), gameplayLaneY, radius));
             id += 1;
         }
     }
@@ -330,7 +331,7 @@ function initializeGame() {
         canvas.style.width = `${window.innerWidth}px`;
         canvas.style.height = `${window.innerHeight}px`;
         context.setTransform(scale, 0, 0, scale, 0, 0);
-        hole.y = window.innerHeight * 0.74;
+        hole.y = window.innerHeight * gameplayLaneY;
         hole.x = Math.max(hole.x, window.innerWidth * 0.18);
     }
     function resetWorldIfComplete() {

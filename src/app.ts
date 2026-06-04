@@ -7,6 +7,7 @@ export const maxLevel = 10;
 export const itemsPerLevel = 5;
 export const startHoleRadius = 20;
 export const growthPerItem = 4;
+export const gameplayLaneY = 0.74;
 
 export type CityItemKind =
   | "trash"
@@ -248,7 +249,7 @@ export function createCityItems(): CityItem[] {
         makeItem(
           id,
           sectionStart + offset * 74 + (lane === 1 ? 18 : 0),
-          0.58 + lane * 0.12,
+          gameplayLaneY,
           radius,
         ),
       );
@@ -428,7 +429,7 @@ function initializeGame() {
     canvas.style.width = `${window.innerWidth}px`;
     canvas.style.height = `${window.innerHeight}px`;
     context.setTransform(scale, 0, 0, scale, 0, 0);
-    hole.y = window.innerHeight * 0.74;
+    hole.y = window.innerHeight * gameplayLaneY;
     hole.x = Math.max(hole.x, window.innerWidth * 0.18);
   }
 
