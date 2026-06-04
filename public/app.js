@@ -86,6 +86,11 @@ export function collectItem(state) {
         bestScore: Math.max(state.bestScore, totalEaten),
     };
 }
+export function canSwallowItem(itemRadius, holeRadius, distance) {
+    if (itemRadius > holeRadius)
+        return false;
+    return distance <= holeRadius + itemRadius * 0.5;
+}
 export function canAdvance(state) {
     const reachedBatch = state.totalEaten > 0 && state.totalEaten % itemsPerLevel === 0;
     return state.level < maxLevel && (state.eaten >= itemsPerLevel || reachedBatch);
@@ -356,7 +361,7 @@ function initializeGame() {
             const dx = box.x - hole.x;
             const dy = box.y - hole.y;
             const distance = Math.hypot(dx, dy);
-            if (item.radius <= hole.radius && distance < hole.radius * 0.86) {
+            if (canSwallowItem(item.radius, hole.radius, distance)) {
                 item.eaten = true;
                 state = collectItem(state);
                 hole.radius = getHoleRadius(state);
