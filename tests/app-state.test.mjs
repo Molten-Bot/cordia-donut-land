@@ -13,6 +13,8 @@ import {
   levels,
   maxLevel,
   parseStoredState,
+  playableMaxY,
+  playableMinY,
   resetRun,
   startHoleRadius,
 } from "../public/app.js";
@@ -89,10 +91,18 @@ test("city items graduate in size and never exceed maximum hole size", () => {
   assert.ok(items.some((item) => ["store", "house", "tower"].includes(item.kind)));
 });
 
-test("starter items spawn on the hole lane so they are reachable", () => {
-  const starterItems = createCityItems().slice(0, itemsPerLevel);
+test("city items spawn statically across the playable land plane", () => {
+  const items = createCityItems();
+  const sameRunItems = createCityItems();
+  const starterItems = items.slice(0, itemsPerLevel);
 
-  assert.ok(starterItems.every((item) => item.y === gameplayLaneY));
+  assert.deepEqual(
+    items.map(({ id, kind, x, y, radius }) => ({ id, kind, x, y, radius })),
+    sameRunItems.map(({ id, kind, x, y, radius }) => ({ id, kind, x, y, radius })),
+  );
+  assert.ok(items.every((item) => item.y >= playableMinY && item.y <= playableMaxY));
+  assert.ok(new Set(starterItems.map((item) => item.y)).size > 1);
+  assert.ok(starterItems.some((item) => item.y === gameplayLaneY));
   assert.ok(starterItems.every((item) => item.radius <= startHoleRadius));
 });
 
