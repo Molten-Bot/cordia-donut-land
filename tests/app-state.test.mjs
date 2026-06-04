@@ -14,6 +14,7 @@ import {
   getHoleRadius,
   getProgressionItemRadius,
   itemsPerLevel,
+  itemsSpawnedPerLevel,
   levels,
   maxHoleRadius,
   maxItemRadius,
@@ -120,6 +121,7 @@ test("city items generally graduate in size and never exceed maximum hole size",
 
   assert.equal(levels.length, maxLevel);
   assert.ok(items.length > maxLevel * itemsPerLevel);
+  assert.equal(items.length, maxLevel * itemsSpawnedPerLevel);
   assert.ok(items[0].radius < items[items.length - 1].radius);
   assert.equal(levels[levels.length - 1].maxRadius, maxItemRadius);
   assert.ok(items.every((item) => item.radius < maxHoleRadius));
@@ -135,7 +137,10 @@ test("spawned item radii stay within real hole growth for each level", () => {
   let state = createDefaultState();
 
   for (let levelIndex = 0; levelIndex < maxLevel; levelIndex += 1) {
-    const levelItems = items.slice(levelIndex * 9, levelIndex * 9 + 9);
+    const levelItems = items.slice(
+      levelIndex * itemsSpawnedPerLevel,
+      levelIndex * itemsSpawnedPerLevel + itemsSpawnedPerLevel,
+    );
 
     for (const item of levelItems.slice(0, itemsPerLevel)) {
       assert.ok(item.radius <= getHoleRadius(state));
@@ -151,6 +156,11 @@ test("city items initialize across the playable land plane", () => {
   const items = createCityItems();
   const starterItems = items.slice(0, itemsPerLevel);
 
+  assert.ok(playableMinX <= 0.05);
+  assert.ok(playableMaxX >= 0.95);
+  assert.ok(playableMinY <= 0.15);
+  assert.ok(playableMaxY >= 0.9);
+  assert.ok(itemsSpawnedPerLevel <= itemsPerLevel + 1);
   assert.ok(items.every((item) => item.x >= playableMinX && item.x <= playableMaxX));
   assert.ok(items.every((item) => item.y >= playableMinY && item.y <= playableMaxY));
   assert.ok(new Set(items.map((item) => item.x)).size > maxLevel * itemsPerLevel);

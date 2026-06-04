@@ -4,17 +4,18 @@ const googleAnalyticsId = "G-ZKTPLMMFDQ";
 const storageKey = "city-hole-state";
 export const maxLevel = 10;
 export const itemsPerLevel = 5;
+export const itemsSpawnedPerLevel = 6;
 export const startHoleRadius = 10;
 export const maxHoleRadius = 38;
 export const maxRunItems = maxLevel * itemsPerLevel;
 export const growthPerItem = (maxHoleRadius - startHoleRadius) / maxRunItems;
 export const minItemRadius = 7;
 export const maxItemRadius = maxHoleRadius - 2;
-export const gameplayLaneY = 0.74;
-export const playableMinX = 0.08;
-export const playableMaxX = 0.92;
-export const playableMinY = 0.52;
-export const playableMaxY = 0.9;
+export const gameplayLaneY = 0.58;
+export const playableMinX = 0.04;
+export const playableMaxX = 0.96;
+export const playableMinY = 0.14;
+export const playableMaxY = 0.92;
 export const levels = Array.from({ length: maxLevel }, (_, index) => {
     const id = index + 1;
     const minRadius = getProgressionItemRadius(index * itemsPerLevel);
@@ -224,13 +225,13 @@ export function createCityItems() {
     for (let levelIndex = 0; levelIndex < maxLevel; levelIndex += 1) {
         const level = levels[levelIndex];
         let holeAfterRequiredItems = getHoleRadius(simulatedState);
-        for (let offset = 0; offset < 9; offset += 1) {
+        for (let offset = 0; offset < itemsSpawnedPerLevel; offset += 1) {
             const itemProgress = levelIndex * itemsPerLevel + Math.min(offset, itemsPerLevel - 1) / 1.25;
             const graduatedRadius = getProgressionItemRadius(itemProgress) + offset * 0.22;
             const availableHoleRadius = offset < itemsPerLevel ? getHoleRadius(simulatedState) : holeAfterRequiredItems;
             const radius = Math.min(Math.max(minItemRadius, graduatedRadius), availableHoleRadius, level.maxRadius, maxItemRadius);
-            const xBand = ((levelIndex * 4 + offset * 3) % 10) / 10;
-            const yBand = ((levelIndex * 3 + offset * 5) % 8) / 8;
+            const xBand = ((levelIndex * 4 + offset * 3) % 12) / 12;
+            const yBand = ((levelIndex * 5 + offset * 7) % 12) / 12;
             const x = playableMinX +
                 (xBand + seededUnit(id + 1) * 0.08) * (playableMaxX - playableMinX);
             const y = playableMinY +
@@ -568,6 +569,7 @@ function initializeGame() {
     });
     document.title = "";
     resize();
+    canvas.focus({ preventScroll: true });
     window.requestAnimationFrame(frame);
 }
 if (typeof document !== "undefined") {
