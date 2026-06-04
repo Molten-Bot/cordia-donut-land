@@ -7,10 +7,11 @@ import {
   collectItem,
   createCityItems,
   createDefaultState,
-  gameplayLaneY,
+  growthPerItem,
   getHoleRadius,
   itemsPerLevel,
   levels,
+  maxHoleRadius,
   maxLevel,
   parseStoredState,
   playableMaxY,
@@ -75,34 +76,30 @@ test("collectItem levels up every five swallowed items", () => {
 test("hole radius grows with swallowed item count", () => {
   const state = { ...createDefaultState(), totalEaten: 8 };
 
-  assert.equal(getHoleRadius(state), startHoleRadius + 32);
+  assert.equal(getHoleRadius(state), startHoleRadius + 8 * growthPerItem);
+  assert.equal(getHoleRadius({ ...state, totalEaten: maxLevel * itemsPerLevel + 4 }), maxHoleRadius);
 });
 
 test("city items graduate in size and never exceed maximum hole size", () => {
   const items = createCityItems();
-  const maxHoleSize = levels[levels.length - 1].maxRadius;
 
   assert.equal(levels.length, maxLevel);
   assert.ok(items.length > maxLevel * itemsPerLevel);
   assert.ok(items[0].radius < items[items.length - 1].radius);
-  assert.ok(items.every((item) => item.radius <= maxHoleSize));
+  assert.equal(levels[levels.length - 1].maxRadius, maxHoleRadius);
+  assert.ok(items.every((item) => item.radius <= maxHoleRadius));
   assert.ok(items.every((item) => item.width <= item.radius * 2 && item.height <= item.radius * 2));
   assert.ok(items.slice(0, 6).some((item) => ["trash", "shoe", "can", "pet"].includes(item.kind)));
-  assert.ok(items.some((item) => ["store", "house", "tower"].includes(item.kind)));
 });
 
-test("city items spawn statically across the playable land plane", () => {
+test("city items spawn randomly across the playable land plane", () => {
   const items = createCityItems();
-  const sameRunItems = createCityItems();
   const starterItems = items.slice(0, itemsPerLevel);
 
-  assert.deepEqual(
-    items.map(({ id, kind, x, y, radius }) => ({ id, kind, x, y, radius })),
-    sameRunItems.map(({ id, kind, x, y, radius }) => ({ id, kind, x, y, radius })),
-  );
   assert.ok(items.every((item) => item.y >= playableMinY && item.y <= playableMaxY));
+  assert.ok(items.every((item) => item.x >= 296));
+  assert.ok(new Set(items.map((item) => item.x)).size > maxLevel * itemsPerLevel);
   assert.ok(new Set(starterItems.map((item) => item.y)).size > 1);
-  assert.ok(starterItems.some((item) => item.y === gameplayLaneY));
   assert.ok(starterItems.every((item) => item.radius <= startHoleRadius));
 });
 

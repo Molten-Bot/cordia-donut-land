@@ -5,8 +5,9 @@ const storageKey = "city-hole-state";
 
 export const maxLevel = 10;
 export const itemsPerLevel = 5;
-export const startHoleRadius = 20;
-export const growthPerItem = 4;
+export const startHoleRadius = 10;
+export const maxHoleRadius = 38;
+export const growthPerItem = (maxHoleRadius - startHoleRadius) / (maxLevel * itemsPerLevel);
 export const gameplayLaneY = 0.74;
 export const playableMinY = 0.52;
 export const playableMaxY = 0.9;
@@ -77,7 +78,7 @@ export const levels: Level[] = Array.from({ length: maxLevel }, (_, index) => {
   return {
     id,
     minRadius,
-    maxRadius: minRadius + itemsPerLevel * growthPerItem,
+    maxRadius: Math.min(minRadius + itemsPerLevel * growthPerItem, maxHoleRadius),
   };
 });
 
@@ -97,7 +98,6 @@ const itemKinds: CityItemKind[] = [
 
 const palette = ["#e04f39", "#f6d83f", "#2f9a88", "#5a78d6", "#8d58a8", "#3f4248", "#f6efe4"];
 const shadow = "rgba(24,42,38,0.22)";
-const playableRows = [playableMinY, 0.62, gameplayLaneY, 0.83, playableMaxY];
 
 export function createDefaultState(): GameState {
   return {
@@ -124,7 +124,7 @@ export function getLevel(state: GameState): Level {
 }
 
 export function getHoleRadius(state: GameState): number {
-  return startHoleRadius + state.totalEaten * growthPerItem;
+  return Math.min(startHoleRadius + state.totalEaten * growthPerItem, maxHoleRadius);
 }
 
 export function parseStoredState(storedState: string | null, defaultState: GameState): GameState {
@@ -244,7 +244,6 @@ function makeItem(id: number, x: number, y: number, radius: number): CityItem {
 
 export function createCityItems(): CityItem[] {
   const items: CityItem[] = [];
-  const maxHoleRadius = levels[levels.length - 1]!.maxRadius;
   let id = 0;
 
   for (let levelIndex = 0; levelIndex < maxLevel; levelIndex += 1) {
@@ -252,15 +251,13 @@ export function createCityItems(): CityItem[] {
     const sectionStart = 260 + levelIndex * 720;
 
     for (let offset = 0; offset < 9; offset += 1) {
-      const graduatedRadius = level.minRadius * 0.42 + offset * 2.6 + levelIndex * 1.8;
+      const graduatedRadius = level.minRadius * 0.42 + offset * 0.54 + levelIndex * 0.36;
       const radius = Math.min(Math.max(7, graduatedRadius), level.maxRadius - 2, maxHoleRadius);
-      const lane = offset % playableRows.length;
-      const laneY = playableRows[lane]!;
       items.push(
         makeItem(
           id,
-          sectionStart + offset * 74 + (lane === 1 ? 18 : 0),
-          laneY,
+          sectionStart + 36 + Math.random() * 612,
+          playableMinY + Math.random() * (playableMaxY - playableMinY),
           radius,
         ),
       );
@@ -476,7 +473,7 @@ function drawItem(ctx: CanvasRenderingContext2D, item: CityItem, cameraX: number
 }
 
 function drawHole(ctx: CanvasRenderingContext2D, hole: Hole) {
-  const radius = Math.max(hole.radius, 38);
+  const radius = Math.min(Math.max(hole.radius, startHoleRadius), maxHoleRadius);
   const gradient = ctx.createRadialGradient(
     hole.x - radius * 0.22,
     hole.y - radius * 0.26,
@@ -502,123 +499,6 @@ function drawHole(ctx: CanvasRenderingContext2D, hole: Hole) {
   ctx.lineWidth = Math.max(3, radius * 0.08);
   ctx.stroke();
   ctx.restore();
-}
-
-function drawCharacter(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  ctx.shadowColor = shadow;
-  ctx.shadowBlur = 14;
-  ctx.shadowOffsetY = 8;
-
-  ctx.fillStyle = "#f4f6f1";
-  ctx.beginPath();
-  ctx.roundRect(-18, -82, 56, 46, 6);
-  ctx.fill();
-  ctx.fillStyle = "#343536";
-  ctx.fillRect(26, -76, 16, 42);
-  ctx.fillRect(-24, -50, 20, 38);
-  ctx.fillStyle = "#7f553e";
-  ctx.beginPath();
-  ctx.arc(-26, -8, 8, 0, Math.PI * 2);
-  ctx.arc(42, -24, 8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#383334";
-  ctx.beginPath();
-  ctx.arc(0, -104, 28, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#1f2022";
-  ctx.beginPath();
-  ctx.moveTo(-30, -116);
-  ctx.lineTo(8, -132);
-  ctx.lineTo(34, -104);
-  ctx.lineTo(0, -96);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#ee5aa6";
-  ctx.fillRect(4, -58, 8, 18);
-  ctx.fillStyle = "#2f3031";
-  ctx.fillRect(32, -34, 22, 70);
-  ctx.fillRect(62, -30, 22, 66);
-  ctx.fillStyle = "#d8dad6";
-  ctx.beginPath();
-  ctx.roundRect(48, 28, 34, 16, 8);
-  ctx.roundRect(78, 26, 34, 16, 8);
-  ctx.fill();
-
-  ctx.restore();
-}
-
-function drawMascot(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  ctx.shadowColor = shadow;
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetY = 7;
-
-  ctx.fillStyle = "#8c807b";
-  ctx.beginPath();
-  ctx.ellipse(0, -34, 34, 48, 0.1, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#3d383a";
-  ctx.beginPath();
-  ctx.roundRect(22, -88, 20, 70, 10);
-  ctx.fill();
-  ctx.fillStyle = "#817774";
-  for (let band = 0; band < 3; band += 1) {
-    ctx.fillRect(24, -78 + band * 18, 16, 9);
-  }
-  ctx.fillStyle = "#d8d1c9";
-  ctx.beginPath();
-  ctx.arc(36, -48, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#282426";
-  ctx.fillRect(20, -54, 32, 12);
-  ctx.beginPath();
-  ctx.arc(44, -44, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#29262a";
-  ctx.beginPath();
-  ctx.moveTo(18, -68);
-  ctx.lineTo(28, -86);
-  ctx.lineTo(35, -64);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.restore();
-}
-
-function drawSceneCharacters(ctx: CanvasRenderingContext2D, width: number, height: number, hole: Hole) {
-  const scale = Math.max(0.58, Math.min(1.15, width / 1180));
-  drawMascot(ctx, hole.x - hole.radius * 1.9, hole.y - hole.radius * 0.18, scale);
-  drawCharacter(ctx, hole.x + hole.radius * 1.95, hole.y + hole.radius * 0.1, scale);
-}
-
-function drawHud(ctx: CanvasRenderingContext2D, state: GameState, width: number) {
-  const pipSize = Math.max(8, Math.min(15, width / 62));
-  const gap = pipSize * 0.65;
-  const levelWidth = maxLevel * (pipSize + gap) - gap;
-  let x = (width - levelWidth) / 2;
-
-  for (let i = 0; i < maxLevel; i += 1) {
-    ctx.beginPath();
-    ctx.arc(x + pipSize / 2, 22, pipSize / 2, 0, Math.PI * 2);
-    ctx.fillStyle = i < state.level ? "#f2b134" : "rgba(255,255,255,0.42)";
-    ctx.fill();
-    x += pipSize + gap;
-  }
-
-  const biteWidth = itemsPerLevel * (pipSize + gap) - gap;
-  x = (width - biteWidth) / 2;
-  for (let i = 0; i < itemsPerLevel; i += 1) {
-    ctx.beginPath();
-    ctx.rect(x, 42, pipSize, pipSize);
-    ctx.fillStyle = i < state.eaten ? "#e04f39" : "rgba(255,255,255,0.36)";
-    ctx.fill();
-    x += pipSize + gap;
-  }
 }
 
 function initializeGame() {
@@ -729,8 +609,6 @@ function initializeGame() {
     drawCityStage(context, width, height, cameraX);
     for (const item of items) drawItem(context, item, cameraX, height);
     drawHole(context, hole);
-    drawSceneCharacters(context, width, height, hole);
-    drawHud(context, state, width);
   }
 
   function frame(now: number) {
