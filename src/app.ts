@@ -12,6 +12,8 @@ export const growthPerItem = (maxHoleRadius - startHoleRadius) / maxRunItems;
 export const minItemRadius = 7;
 export const maxItemRadius = maxHoleRadius - 2;
 export const gameplayLaneY = 0.74;
+export const playableMinX = 0.08;
+export const playableMaxX = 0.92;
 export const playableMinY = 0.52;
 export const playableMaxY = 0.9;
 
@@ -291,6 +293,11 @@ function makeItem(id: number, x: number, y: number, radius: number): CityItem {
   };
 }
 
+function seededUnit(seed: number): number {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+}
+
 export function createCityItems(): CityItem[] {
   const items: CityItem[] = [];
   let simulatedState = createDefaultState();
@@ -298,7 +305,6 @@ export function createCityItems(): CityItem[] {
 
   for (let levelIndex = 0; levelIndex < maxLevel; levelIndex += 1) {
     const level = levels[levelIndex]!;
-    const sectionStart = 260 + levelIndex * 720;
     let holeAfterRequiredItems = getHoleRadius(simulatedState);
 
     for (let offset = 0; offset < 9; offset += 1) {
@@ -306,11 +312,19 @@ export function createCityItems(): CityItem[] {
       const graduatedRadius = getProgressionItemRadius(itemProgress) + offset * 0.22;
       const availableHoleRadius = offset < itemsPerLevel ? getHoleRadius(simulatedState) : holeAfterRequiredItems;
       const radius = Math.min(Math.max(minItemRadius, graduatedRadius), availableHoleRadius, level.maxRadius, maxItemRadius);
+      const xBand = ((levelIndex * 4 + offset * 3) % 10) / 10;
+      const yBand = ((levelIndex * 3 + offset * 5) % 8) / 8;
+      const x =
+        playableMinX +
+        (xBand + seededUnit(id + 1) * 0.08) * (playableMaxX - playableMinX);
+      const y =
+        playableMinY +
+        (yBand + seededUnit(id + 91) * 0.1) * (playableMaxY - playableMinY);
       items.push(
         makeItem(
           id,
-          sectionStart + 36 + Math.random() * 612,
-          playableMinY + Math.random() * (playableMaxY - playableMinY),
+          Math.min(playableMaxX, x),
+          Math.min(playableMaxY, y),
           radius,
         ),
       );
@@ -385,7 +399,7 @@ function drawIsoBlock(
   ctx.fill();
 }
 
-function drawCityStage(ctx: CanvasRenderingContext2D, width: number, height: number, cameraX: number) {
+function drawCityStage(ctx: CanvasRenderingContext2D, width: number, height: number) {
   const sky = ctx.createLinearGradient(0, 0, 0, height);
   sky.addColorStop(0, "#27d27f");
   sky.addColorStop(0.58, "#30f198");
@@ -398,7 +412,7 @@ function drawCityStage(ctx: CanvasRenderingContext2D, width: number, height: num
   ctx.fillRect(0, horizon, width, height * 0.2);
 
   for (let i = -2; i < 18; i += 1) {
-    const x = ((i * 124 - cameraX * 0.12) % (width + 220)) - 90;
+    const x = ((i * 124) % (width + 220)) - 90;
     const blockHeight = height * (0.08 + ((i + 5) % 4) * 0.025);
     drawIsoBlock(ctx, x, horizon + height * 0.1, 54, 30, blockHeight, ["#5667b8", "#e65f59", "#f6c64f", "#4fb8a7"][Math.abs(i) % 4]!);
   }
@@ -406,18 +420,10 @@ function drawCityStage(ctx: CanvasRenderingContext2D, width: number, height: num
   const laneY = height * gameplayLaneY;
   const landTop = height * playableMinY;
   const landBottom = height * playableMaxY;
-  ctx.save();
-  ctx.translate(width / 2, laneY + height * 0.03);
-  ctx.scale(1, 0.46);
-  ctx.beginPath();
-  ctx.arc(0, 0, Math.max(width, height) * 0.42, 0, Math.PI * 2);
-  ctx.fillStyle = "#16bd6f";
-  ctx.fill();
-  ctx.restore();
 
   for (let row = 0; row < 4; row += 1) {
     for (let col = -3; col < 8; col += 1) {
-      const x = ((col * 164 + row * 58 - cameraX * 0.42) % (width + 260)) - 130;
+      const x = ((col * 164 + row * 58) % (width + 260)) - 130;
       const y = laneY - 104 + row * 58;
       drawIsoDiamond(ctx, x, y, 116, 48, row % 2 === 0 ? "rgba(255,255,255,0.08)" : "rgba(16,137,90,0.14)");
     }
@@ -442,7 +448,7 @@ function drawCityStage(ctx: CanvasRenderingContext2D, width: number, height: num
   ctx.stroke();
 
   for (let i = -2; i < 15; i += 1) {
-    const x = ((i * 132 - cameraX * 0.3) % (width + 180)) - 90;
+    const x = ((i * 132) % (width + 180)) - 90;
     const y = laneY + 58 + ((i % 3) * 22);
     ctx.fillStyle = i % 2 === 0 ? "#10b56a" : "#13c675";
     ctx.beginPath();
@@ -454,8 +460,8 @@ function drawCityStage(ctx: CanvasRenderingContext2D, width: number, height: num
   }
 }
 
-function itemScreenBox(item: CityItem, cameraX: number, height: number) {
-  const x = item.x - cameraX;
+function itemScreenBox(item: CityItem, width: number, height: number) {
+  const x = item.x * width;
   const y = item.y * height;
   return {
     x,
@@ -467,8 +473,8 @@ function itemScreenBox(item: CityItem, cameraX: number, height: number) {
   };
 }
 
-function drawItem(ctx: CanvasRenderingContext2D, item: CityItem, cameraX: number, height: number) {
-  const box = itemScreenBox(item, cameraX, height);
+function drawItem(ctx: CanvasRenderingContext2D, item: CityItem, width: number, height: number) {
+  const box = itemScreenBox(item, width, height);
   if (box.right < -80 || box.left > ctx.canvas.width + 80 || item.eaten) return;
 
   ctx.save();
@@ -578,7 +584,6 @@ function initializeGame() {
     radius: getHoleRadius(state),
     speed: 160,
   };
-  let cameraX = 0;
   let lastTime = performance.now();
 
   function saveState() {
@@ -593,26 +598,25 @@ function initializeGame() {
     canvas.style.height = `${window.innerHeight}px`;
     context.setTransform(scale, 0, 0, scale, 0, 0);
     if (hole.y === 0) hole.y = window.innerHeight * gameplayLaneY;
-    hole.x = Math.max(window.innerWidth * 0.22, Math.min(window.innerWidth * 0.78, hole.x));
+    hole.x = Math.max(window.innerWidth * playableMinX, Math.min(window.innerWidth * playableMaxX, hole.x));
     hole.y = Math.max(window.innerHeight * playableMinY, Math.min(window.innerHeight * playableMaxY, hole.y));
   }
 
   function resetWorldIfComplete() {
     if (state.level < maxLevel || state.totalEaten < maxLevel * itemsPerLevel) return;
-    const allVisibleItemsEaten = items.every((item) => item.eaten || item.x < cameraX - 160);
+    const allVisibleItemsEaten = items.every((item) => item.eaten);
     if (!allVisibleItemsEaten) return;
     state = resetRun(state);
     items = createCityItems();
     hole.x = window.innerWidth * 0.5;
     hole.y = window.innerHeight * gameplayLaneY;
-    cameraX = 0;
     saveState();
   }
 
   function eatCollisions() {
     for (const item of items) {
       if (item.eaten) continue;
-      const box = itemScreenBox(item, cameraX, window.innerHeight);
+      const box = itemScreenBox(item, window.innerWidth, window.innerHeight);
       if (box.right < hole.x - hole.radius || box.left > hole.x + hole.radius) continue;
       const dx = box.x - hole.x;
       const dy = box.y - hole.y;
@@ -644,17 +648,8 @@ function initializeGame() {
     const diagonalScale = movementX !== 0 && movementY !== 0 ? Math.SQRT1_2 : 1;
     hole.x += movementX * hole.speed * 1.65 * diagonalScale * delta;
     hole.y += movementY * hole.speed * 1.65 * diagonalScale * delta;
-    hole.x = Math.max(width * 0.12, Math.min(width * 0.88, hole.x));
+    hole.x = Math.max(width * playableMinX, Math.min(width * playableMaxX, hole.x));
     hole.y = Math.max(height * playableMinY, Math.min(height * playableMaxY, hole.y));
-
-    if (hole.x > width * 0.68) {
-      cameraX += (hole.x - width * 0.68) * 0.035;
-      hole.x -= (hole.x - width * 0.68) * 0.025;
-    } else if (hole.x < width * 0.28 && cameraX > 0) {
-      const shift = Math.min(cameraX, (width * 0.28 - hole.x) * 0.035);
-      cameraX -= shift;
-      hole.x += shift * 0.72;
-    }
 
     eatCollisions();
     resetWorldIfComplete();
@@ -664,8 +659,8 @@ function initializeGame() {
     const width = window.innerWidth;
     const height = window.innerHeight;
     context.clearRect(0, 0, width, height);
-    drawCityStage(context, width, height, cameraX);
-    for (const item of items) drawItem(context, item, cameraX, height);
+    drawCityStage(context, width, height);
+    for (const item of items) drawItem(context, item, width, height);
     drawHole(context, hole);
   }
 
