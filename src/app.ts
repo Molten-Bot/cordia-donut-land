@@ -92,7 +92,8 @@ const itemKinds: CityItemKind[] = [
   "tower",
 ];
 
-const palette = ["#e04f39", "#f2b134", "#288a7a", "#4c6fbf", "#774c9e", "#30333a", "#f6efe4"];
+const palette = ["#e04f39", "#f6d83f", "#2f9a88", "#5a78d6", "#8d58a8", "#3f4248", "#f6efe4"];
+const shadow = "rgba(24,42,38,0.22)";
 
 export function createDefaultState(): GameState {
   return {
@@ -265,29 +266,118 @@ export function createCityItems(): CityItem[] {
   return items;
 }
 
-function drawRoad(ctx: CanvasRenderingContext2D, width: number, height: number, cameraX: number) {
+function drawIsoDiamond(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string,
+) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - height / 2);
+  ctx.lineTo(x + width / 2, y);
+  ctx.lineTo(x, y + height / 2);
+  ctx.lineTo(x - width / 2, y);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function drawIsoBlock(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  depth: number,
+  height: number,
+  color: string,
+) {
+  const top = y - height;
+  const halfWidth = width / 2;
+  const halfDepth = depth / 2;
+
+  ctx.beginPath();
+  ctx.moveTo(x, top - halfDepth);
+  ctx.lineTo(x + halfWidth, top);
+  ctx.lineTo(x, top + halfDepth);
+  ctx.lineTo(x - halfWidth, top);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(x + halfWidth, top);
+  ctx.lineTo(x + halfWidth, y);
+  ctx.lineTo(x, y + halfDepth);
+  ctx.lineTo(x, top + halfDepth);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(x - halfWidth, top);
+  ctx.lineTo(x, top + halfDepth);
+  ctx.lineTo(x, y + halfDepth);
+  ctx.lineTo(x - halfWidth, y);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(255,255,255,0.16)";
+  ctx.fill();
+}
+
+function drawCityStage(ctx: CanvasRenderingContext2D, width: number, height: number, cameraX: number) {
   const sky = ctx.createLinearGradient(0, 0, 0, height);
-  sky.addColorStop(0, "#86c7d7");
-  sky.addColorStop(0.46, "#d8e3c5");
-  sky.addColorStop(0.461, "#76736d");
-  sky.addColorStop(1, "#3c3b38");
+  sky.addColorStop(0, "#27d27f");
+  sky.addColorStop(0.58, "#30f198");
+  sky.addColorStop(1, "#20d979");
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, width, height);
 
-  ctx.strokeStyle = "rgba(255,255,255,0.55)";
-  ctx.lineWidth = 4;
-  ctx.setLineDash([34, 40]);
-  const laneY = height * 0.72;
-  ctx.beginPath();
-  ctx.moveTo((-cameraX * 0.8) % 74, laneY);
-  ctx.lineTo(width, laneY);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  const horizon = height * 0.36;
+  ctx.fillStyle = "rgba(25,133,99,0.12)";
+  ctx.fillRect(0, horizon, width, height * 0.2);
 
-  ctx.fillStyle = "rgba(40,45,47,0.22)";
-  for (let i = -1; i < 22; i += 1) {
-    const x = ((i * 120 - cameraX * 0.18) % (width + 140)) - 80;
-    ctx.fillRect(x, height * 0.34, 46, height * 0.16);
+  for (let i = -2; i < 18; i += 1) {
+    const x = ((i * 124 - cameraX * 0.12) % (width + 220)) - 90;
+    const blockHeight = height * (0.08 + ((i + 5) % 4) * 0.025);
+    drawIsoBlock(ctx, x, horizon + height * 0.1, 54, 30, blockHeight, ["#5667b8", "#e65f59", "#f6c64f", "#4fb8a7"][Math.abs(i) % 4]!);
+  }
+
+  const laneY = height * gameplayLaneY;
+  ctx.save();
+  ctx.translate(width / 2, laneY + height * 0.03);
+  ctx.scale(1, 0.46);
+  ctx.beginPath();
+  ctx.arc(0, 0, Math.max(width, height) * 0.42, 0, Math.PI * 2);
+  ctx.fillStyle = "#16bd6f";
+  ctx.fill();
+  ctx.restore();
+
+  for (let row = 0; row < 4; row += 1) {
+    for (let col = -3; col < 8; col += 1) {
+      const x = ((col * 164 + row * 58 - cameraX * 0.42) % (width + 260)) - 130;
+      const y = laneY - 104 + row * 58;
+      drawIsoDiamond(ctx, x, y, 116, 48, row % 2 === 0 ? "rgba(255,255,255,0.08)" : "rgba(16,137,90,0.14)");
+    }
+  }
+
+  ctx.strokeStyle = "rgba(9,104,77,0.28)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, laneY + 8);
+  ctx.quadraticCurveTo(width * 0.5, laneY - 68, width, laneY + 12);
+  ctx.stroke();
+
+  for (let i = -2; i < 15; i += 1) {
+    const x = ((i * 132 - cameraX * 0.3) % (width + 180)) - 90;
+    const y = laneY + 58 + ((i % 3) * 22);
+    ctx.fillStyle = i % 2 === 0 ? "#10b56a" : "#13c675";
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 16, y - 54);
+    ctx.lineTo(x + 25, y);
+    ctx.closePath();
+    ctx.fill();
   }
 }
 
@@ -310,52 +400,72 @@ function drawItem(ctx: CanvasRenderingContext2D, item: CityItem, cameraX: number
 
   ctx.save();
   ctx.translate(box.x, box.y);
-  ctx.fillStyle = item.color;
-  ctx.strokeStyle = "rgba(22,24,26,0.42)";
-  ctx.lineWidth = 2;
+  ctx.shadowColor = shadow;
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 6;
 
   if (item.kind === "store" || item.kind === "house" || item.kind === "tower") {
-    ctx.fillRect(-item.width / 2, -item.height, item.width, item.height);
-    ctx.strokeRect(-item.width / 2, -item.height, item.width, item.height);
-    ctx.fillStyle = "rgba(255,239,180,0.88)";
+    drawIsoBlock(ctx, 0, 0, item.width * 1.18, item.width * 0.72, item.height, item.color);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#fff2a8";
     const rows = Math.max(1, Math.floor(item.height / 28));
     for (let row = 0; row < rows; row += 1) {
       for (let col = -1; col <= 1; col += 1) {
-        ctx.fillRect(col * item.width * 0.22 - 5, -item.height + 12 + row * 24, 10, 10);
+        ctx.fillRect(col * item.width * 0.18 - 4, -item.height + 10 + row * 24, 8, 8);
       }
     }
   } else if (item.kind === "pet") {
+    ctx.fillStyle = "#887b76";
     ctx.beginPath();
-    ctx.ellipse(0, -item.radius * 0.55, item.radius, item.radius * 0.58, 0, 0, Math.PI * 2);
+    ctx.ellipse(-item.radius * 0.12, -item.radius * 0.62, item.radius, item.radius * 0.62, -0.06, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
+    ctx.fillStyle = "#3b3839";
+    for (let band = 0; band < 4; band += 1) {
+      ctx.fillRect(-item.radius * 0.88 + band * item.radius * 0.36, -item.radius * 1.08, item.radius * 0.18, item.radius * 0.86);
+    }
+    ctx.fillStyle = "#d8d2c7";
     ctx.beginPath();
-    ctx.arc(item.radius * 0.7, -item.radius, item.radius * 0.42, 0, Math.PI * 2);
+    ctx.arc(item.radius * 0.66, -item.radius * 0.96, item.radius * 0.42, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
+    ctx.fillStyle = "#2c292b";
+    ctx.fillRect(item.radius * 0.36, -item.radius * 1.05, item.radius * 0.54, item.radius * 0.18);
+    ctx.fillRect(item.radius * 0.52, -item.radius * 0.88, item.radius * 0.16, item.radius * 0.12);
   } else if (item.kind === "shoe") {
+    ctx.fillStyle = "#f278c7";
     ctx.beginPath();
-    ctx.roundRect(-item.width / 2, -item.height * 0.62, item.width, item.height * 0.5, 7);
+    ctx.roundRect(-item.width / 2, -item.height * 0.62, item.width, item.height * 0.48, 9);
     ctx.fill();
-    ctx.stroke();
+    ctx.fillStyle = "#eec75b";
+    ctx.fillRect(-item.width * 0.38, -item.height * 0.34, item.width * 0.7, item.height * 0.18);
+  } else if (item.kind === "trash" || item.kind === "can") {
+    ctx.rotate((item.id % 5) * 0.14 - 0.28);
+    ctx.fillStyle = item.kind === "can" ? "#d9dde2" : "#f1c95e";
+    ctx.beginPath();
+    ctx.roundRect(-item.width / 2, -item.height, item.width, item.height, 5);
+    ctx.fill();
+    ctx.fillStyle = item.kind === "can" ? "#7a8796" : "#e64e94";
+    ctx.fillRect(-item.width * 0.38, -item.height * 0.68, item.width * 0.76, item.height * 0.18);
   } else {
+    drawIsoDiamond(ctx, 0, -item.height * 0.4, item.width, item.height, item.color);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
     ctx.beginPath();
-    ctx.roundRect(-item.width / 2, -item.height, item.width, item.height, 6);
+    ctx.roundRect(-item.width * 0.28, -item.height * 0.58, item.width * 0.56, item.height * 0.22, 4);
     ctx.fill();
-    ctx.stroke();
   }
 
   ctx.restore();
 }
 
 function drawHole(ctx: CanvasRenderingContext2D, hole: Hole) {
+  const radius = Math.max(hole.radius, 38);
   const gradient = ctx.createRadialGradient(
-    hole.x - hole.radius * 0.22,
-    hole.y - hole.radius * 0.26,
-    hole.radius * 0.18,
+    hole.x - radius * 0.22,
+    hole.y - radius * 0.26,
+    radius * 0.18,
     hole.x,
     hole.y,
-    hole.radius,
+    radius,
   );
   gradient.addColorStop(0, "#364046");
   gradient.addColorStop(0.58, "#070808");
@@ -363,17 +473,109 @@ function drawHole(ctx: CanvasRenderingContext2D, hole: Hole) {
 
   ctx.save();
   ctx.beginPath();
-  ctx.ellipse(hole.x, hole.y, hole.radius * 1.18, hole.radius * 0.66, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0,0,0,0.24)";
+  ctx.ellipse(hole.x, hole.y + radius * 0.08, radius * 1.26, radius * 0.72, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(10,84,60,0.32)";
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(hole.x, hole.y, hole.radius, 0, Math.PI * 2);
+  ctx.ellipse(hole.x, hole.y, radius * 1.14, radius * 0.7, 0, 0, Math.PI * 2);
   ctx.fillStyle = gradient;
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.2)";
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(38,220,144,0.36)";
+  ctx.lineWidth = Math.max(3, radius * 0.08);
   ctx.stroke();
   ctx.restore();
+}
+
+function drawCharacter(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.shadowColor = shadow;
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 8;
+
+  ctx.fillStyle = "#f4f6f1";
+  ctx.beginPath();
+  ctx.roundRect(-18, -82, 56, 46, 6);
+  ctx.fill();
+  ctx.fillStyle = "#343536";
+  ctx.fillRect(26, -76, 16, 42);
+  ctx.fillRect(-24, -50, 20, 38);
+  ctx.fillStyle = "#7f553e";
+  ctx.beginPath();
+  ctx.arc(-26, -8, 8, 0, Math.PI * 2);
+  ctx.arc(42, -24, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#383334";
+  ctx.beginPath();
+  ctx.arc(0, -104, 28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#1f2022";
+  ctx.beginPath();
+  ctx.moveTo(-30, -116);
+  ctx.lineTo(8, -132);
+  ctx.lineTo(34, -104);
+  ctx.lineTo(0, -96);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#ee5aa6";
+  ctx.fillRect(4, -58, 8, 18);
+  ctx.fillStyle = "#2f3031";
+  ctx.fillRect(32, -34, 22, 70);
+  ctx.fillRect(62, -30, 22, 66);
+  ctx.fillStyle = "#d8dad6";
+  ctx.beginPath();
+  ctx.roundRect(48, 28, 34, 16, 8);
+  ctx.roundRect(78, 26, 34, 16, 8);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawMascot(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.shadowColor = shadow;
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 7;
+
+  ctx.fillStyle = "#8c807b";
+  ctx.beginPath();
+  ctx.ellipse(0, -34, 34, 48, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#3d383a";
+  ctx.beginPath();
+  ctx.roundRect(22, -88, 20, 70, 10);
+  ctx.fill();
+  ctx.fillStyle = "#817774";
+  for (let band = 0; band < 3; band += 1) {
+    ctx.fillRect(24, -78 + band * 18, 16, 9);
+  }
+  ctx.fillStyle = "#d8d1c9";
+  ctx.beginPath();
+  ctx.arc(36, -48, 22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#282426";
+  ctx.fillRect(20, -54, 32, 12);
+  ctx.beginPath();
+  ctx.arc(44, -44, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#29262a";
+  ctx.beginPath();
+  ctx.moveTo(18, -68);
+  ctx.lineTo(28, -86);
+  ctx.lineTo(35, -64);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawSceneCharacters(ctx: CanvasRenderingContext2D, width: number, height: number, hole: Hole) {
+  const scale = Math.max(0.58, Math.min(1.15, width / 1180));
+  drawMascot(ctx, hole.x - hole.radius * 1.9, hole.y - hole.radius * 0.18, scale);
+  drawCharacter(ctx, hole.x + hole.radius * 1.95, hole.y + hole.radius * 0.1, scale);
 }
 
 function drawHud(ctx: CanvasRenderingContext2D, state: GameState, width: number) {
@@ -415,7 +617,7 @@ function initializeGame() {
   const keys = new Set<string>();
   const pointer: PointerState = { active: false, x: 0 };
   const hole: Hole = {
-    x: 120,
+    x: Math.max(120, window.innerWidth * 0.5),
     y: 0,
     radius: getHoleRadius(state),
     speed: 160,
@@ -435,7 +637,7 @@ function initializeGame() {
     canvas.style.height = `${window.innerHeight}px`;
     context.setTransform(scale, 0, 0, scale, 0, 0);
     hole.y = window.innerHeight * gameplayLaneY;
-    hole.x = Math.max(hole.x, window.innerWidth * 0.18);
+    hole.x = Math.max(window.innerWidth * 0.22, Math.min(window.innerWidth * 0.78, hole.x));
   }
 
   function resetWorldIfComplete() {
@@ -444,7 +646,7 @@ function initializeGame() {
     if (!allVisibleItemsEaten) return;
     state = resetRun(state);
     items = createCityItems();
-    hole.x = window.innerWidth * 0.2;
+    hole.x = window.innerWidth * 0.5;
     cameraX = 0;
     saveState();
   }
@@ -496,9 +698,10 @@ function initializeGame() {
     const width = window.innerWidth;
     const height = window.innerHeight;
     context.clearRect(0, 0, width, height);
-    drawRoad(context, width, height, cameraX);
+    drawCityStage(context, width, height, cameraX);
     for (const item of items) drawItem(context, item, cameraX, height);
     drawHole(context, hole);
+    drawSceneCharacters(context, width, height, hole);
     drawHud(context, state, width);
   }
 
