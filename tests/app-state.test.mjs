@@ -3,13 +3,17 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
-  advanceLevel,
-  canAdvance,
-  collectFood,
+  collectItem,
+  createCityItems,
   createDefaultState,
-  getLevel,
+  gameplayLaneY,
+  getHoleRadius,
+  itemsPerLevel,
+  levels,
+  maxLevel,
   parseStoredState,
   resetRun,
+  startHoleRadius,
 } from "../public/app.js";
 
 test("createDefaultState marks release zero and starts level one", () => {
@@ -18,29 +22,29 @@ test("createDefaultState marks release zero and starts level one", () => {
   assert.deepEqual(state, {
     release: "0",
     level: 1,
-    donuts: 0,
-    treats: { donut: 0, milk: 0, sprinkles: 0 },
+    eaten: 0,
+    totalEaten: 0,
     bestScore: 0,
     muted: false,
   });
 });
 
-test("parseStoredState sanitizes stored values", () => {
+test("parseStoredState sanitizes stored values and derives progress", () => {
   const defaultState = createDefaultState();
   const stored = JSON.stringify({
     release: "old",
-    level: 99,
-    donuts: 14.8,
-    treats: { donut: 2.2, milk: -4, sprinkles: 1 },
+    level: 2,
+    eaten: 19.8,
+    totalEaten: 14.8,
     bestScore: 22,
     muted: true,
   });
 
   assert.deepEqual(parseStoredState(stored, defaultState), {
     release: "0",
-    level: 4,
-    donuts: 14,
-    treats: { donut: 2, milk: 0, sprinkles: 1 },
+    level: 3,
+    eaten: 4,
+    totalEaten: 14,
     bestScore: 22,
     muted: true,
   });
@@ -52,36 +56,51 @@ test("parseStoredState falls back when stored JSON is invalid", () => {
   assert.equal(parseStoredState("{", defaultState), defaultState);
 });
 
-test("collectFood updates score, treat totals, and best score immutably", () => {
-  const state = createDefaultState();
-  const collected = collectFood(collectFood(state, "milk"), "sprinkles");
+test("collectItem levels up every five swallowed items", () => {
+  let state = createDefaultState();
 
-  assert.equal(collected.donuts, 8);
-  assert.equal(collected.bestScore, 8);
-  assert.deepEqual(collected.treats, { donut: 0, milk: 1, sprinkles: 1 });
-  assert.equal(state.donuts, 0);
+  for (let index = 0; index < itemsPerLevel; index += 1) {
+    state = collectItem(state);
+  }
+
+  assert.equal(state.level, 2);
+  assert.equal(state.eaten, 0);
+  assert.equal(state.totalEaten, 5);
+  assert.equal(state.bestScore, 5);
 });
 
-test("advanceLevel moves forward only after goal", () => {
-  const state = {
-    ...createDefaultState(),
-    donuts: getLevel(createDefaultState()).goal,
-  };
+test("hole radius grows with swallowed item count", () => {
+  const state = { ...createDefaultState(), totalEaten: 8 };
 
-  assert.equal(canAdvance(state), true);
-  assert.deepEqual(advanceLevel(state), {
-    ...state,
-    level: 2,
-    donuts: 0,
-  });
-  assert.equal(advanceLevel(createDefaultState()).level, 1);
+  assert.equal(getHoleRadius(state), startHoleRadius + 32);
+});
+
+test("city items graduate in size and never exceed maximum hole size", () => {
+  const items = createCityItems();
+  const maxHoleSize = levels[levels.length - 1].maxRadius;
+
+  assert.equal(levels.length, maxLevel);
+  assert.ok(items.length > maxLevel * itemsPerLevel);
+  assert.ok(items[0].radius < items[items.length - 1].radius);
+  assert.ok(items.every((item) => item.radius <= maxHoleSize));
+  assert.ok(items.every((item) => item.width <= item.radius * 2 && item.height <= item.radius * 2));
+  assert.ok(items.slice(0, 6).some((item) => ["trash", "shoe", "can", "pet"].includes(item.kind)));
+  assert.ok(items.some((item) => ["store", "house", "tower"].includes(item.kind)));
+});
+
+test("starter items spawn on the hole lane so they are reachable", () => {
+  const starterItems = createCityItems().slice(0, itemsPerLevel);
+
+  assert.ok(starterItems.every((item) => item.y === gameplayLaneY));
+  assert.ok(starterItems.every((item) => item.radius <= startHoleRadius));
 });
 
 test("resetRun preserves best score and quiet mode", () => {
   const reset = resetRun({
     ...createDefaultState(),
     level: 3,
-    donuts: 12,
+    eaten: 2,
+    totalEaten: 12,
     bestScore: 90,
     muted: true,
   });
