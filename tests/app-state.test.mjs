@@ -3,66 +3,50 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
-  addItem,
-  clearDoneItems,
-  createDefaultState,
-  parseStoredState,
-  removeItem,
-  updateItem,
+  clampHoleToScreen,
+  consumeDisc,
+  createInitialHole,
+  isDiscConsumed,
+  parseBestScore,
 } from "../public/app.js";
 
-test("createDefaultState uses supplied id factory", () => {
-  let nextId = 1;
-  const state = createDefaultState(() => `item-${nextId++}`);
+test("createInitialHole centers the player and uses stored best score", () => {
+  const hole = createInitialHole(800, 600, 42);
 
-  assert.deepEqual(
-    state.items.map((item) => item.id),
-    ["item-1", "item-2", "item-3"],
-  );
+  assert.equal(hole.x, 400);
+  assert.equal(hole.y, 300);
+  assert.equal(hole.bestScore, 42);
+  assert.equal(hole.score, 0);
+  assert.equal(hole.combo, 1);
 });
 
-test("parseStoredState merges valid stored values with defaults", () => {
-  const defaultState = createDefaultState(() => "default-id");
-  const stored = JSON.stringify({
-    appName: "Typed Cordia",
-    theme: "dark",
-    items: [{ id: "stored-id", text: "Stored item", done: true }],
-  });
+test("clampHoleToScreen keeps hole fully visible", () => {
+  const hole = createInitialHole(400, 300);
+  const clamped = clampHoleToScreen({ ...hole, x: -100, y: 999 }, 400, 300);
 
-  assert.deepEqual(parseStoredState(stored, defaultState), {
-    appName: "Typed Cordia",
-    theme: "dark",
-    items: [{ id: "stored-id", text: "Stored item", done: true }],
-  });
+  assert.equal(clamped.x, clamped.radius);
+  assert.equal(clamped.y, 300 - clamped.radius);
 });
 
-test("parseStoredState falls back when stored JSON is invalid", () => {
-  const defaultState = createDefaultState(() => "default-id");
+test("disc consumption checks center distance and grows score state", () => {
+  const hole = createInitialHole(600, 500, 8);
+  const disc = { id: 1, x: hole.x + 4, y: hole.y, radius: 20, speed: 1, color: "#fff" };
 
-  assert.equal(parseStoredState("{", defaultState), defaultState);
+  assert.equal(isDiscConsumed(hole, disc), true);
+
+  const consumed = consumeDisc(hole, disc);
+
+  assert.equal(consumed.score, 20);
+  assert.equal(consumed.bestScore, 20);
+  assert.equal(consumed.combo > hole.combo, true);
+  assert.equal(consumed.radius > hole.radius, true);
 });
 
-test("item reducers add, update, remove, and clear items immutably", () => {
-  const state = {
-    appName: "Cordia",
-    theme: "system",
-    items: [
-      { id: "one", text: "One", done: false },
-      { id: "two", text: "Two", done: true },
-    ],
-  };
-
-  const added = addItem(state, "Three", () => "three");
-  const updated = updateItem(added, "one", { done: true });
-  const removed = removeItem(updated, "two");
-  const cleared = clearDoneItems(removed);
-
-  assert.deepEqual(added.items[0], { id: "three", text: "Three", done: false });
-  assert.equal(state.items[0].done, false);
-  assert.deepEqual(
-    cleared.items,
-    [{ id: "three", text: "Three", done: false }],
-  );
+test("parseBestScore accepts positive integers only", () => {
+  assert.equal(parseBestScore("18"), 18);
+  assert.equal(parseBestScore("-1"), 0);
+  assert.equal(parseBestScore("nope"), 0);
+  assert.equal(parseBestScore(null), 0);
 });
 
 test("served files do not reference disallowed providers or tooling", async () => {

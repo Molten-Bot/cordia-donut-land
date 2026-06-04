@@ -1,67 +1,44 @@
-// Google Analytics default capture for this template.
-// Future LLM edits: do not remove this gtag setup unless replacing it with equivalent page analytics capture.
+// Google Analytics page capture.
+// Future edits: keep equivalent page analytics capture when changing this setup.
 const googleAnalyticsId = "G-ZKTPLMMFDQ";
-const storageKey = "cordia-template-state";
-function createItem(text, done, idFactory) {
-    return { id: idFactory(), text, done };
-}
-export function createDefaultState(idFactory = () => crypto.randomUUID()) {
+const storageKey = "hole-run-best-score";
+export function createInitialHole(width, height, bestScore = 0) {
     return {
-        appName: "Cordia",
-        theme: "system",
-        items: [
-            createItem("Replace starter content", false, idFactory),
-            createItem("Add app-specific data model", false, idFactory),
-            createItem("Publish public folder to your hosting provider", true, idFactory),
-        ],
+        x: width / 2,
+        y: height / 2,
+        radius: Math.max(36, Math.min(width, height) * 0.085),
+        score: 0,
+        bestScore,
+        combo: 1,
     };
 }
-function isTheme(value) {
-    return value === "system" || value === "light" || value === "dark";
+export function distanceBetween(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
 }
-function isItem(value) {
-    if (!value || typeof value !== "object")
-        return false;
-    const item = value;
-    return (typeof item.id === "string" &&
-        typeof item.text === "string" &&
-        typeof item.done === "boolean");
+export function isDiscConsumed(hole, disc) {
+    return distanceBetween(hole, disc) + disc.radius * 0.42 < hole.radius;
 }
-export function parseStoredState(storedState, defaultState) {
-    if (!storedState)
-        return defaultState;
-    try {
-        const parsed = JSON.parse(storedState);
-        return {
-            appName: typeof parsed.appName === "string" ? parsed.appName : defaultState.appName,
-            theme: isTheme(parsed.theme) ? parsed.theme : defaultState.theme,
-            items: Array.isArray(parsed.items) && parsed.items.every(isItem) ? parsed.items : defaultState.items,
-        };
-    }
-    catch {
-        return defaultState;
-    }
-}
-export function updateItem(state, id, patch) {
+export function consumeDisc(hole, disc) {
+    const scoreGain = Math.ceil(disc.radius * hole.combo);
+    const nextScore = hole.score + scoreGain;
     return {
-        ...state,
-        items: state.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+        ...hole,
+        radius: Math.min(118, hole.radius + disc.radius * 0.055),
+        score: nextScore,
+        bestScore: Math.max(hole.bestScore, nextScore),
+        combo: Math.min(8, hole.combo + 0.18),
     };
 }
-export function removeItem(state, id) {
+export function clampHoleToScreen(hole, width, height) {
     return {
-        ...state,
-        items: state.items.filter((item) => item.id !== id),
+        ...hole,
+        x: Math.max(hole.radius, Math.min(width - hole.radius, hole.x)),
+        y: Math.max(hole.radius, Math.min(height - hole.radius, hole.y)),
     };
 }
-export function addItem(state, text, idFactory = () => crypto.randomUUID()) {
-    return {
-        ...state,
-        items: [createItem(text, false, idFactory), ...state.items],
-    };
-}
-export function clearDoneItems(state) {
-    return { ...state, items: state.items.filter((item) => !item.done) };
+export function parseBestScore(storedScore) {
+    const value = Number.parseInt(storedScore ?? "", 10);
+    return Number.isFinite(value) && value > 0 ? value : 0;
 }
 function initializeGoogleAnalytics() {
     const googleTagScript = document.createElement("script");
@@ -84,117 +61,177 @@ function getElement(selector, type) {
 }
 function getElements() {
     return {
-        appNameInput: getElement("#app-name", HTMLInputElement),
-        clearItemsButton: getElement("#clear-items", HTMLButtonElement),
-        itemCount: getElement("#item-count", HTMLElement),
-        itemForm: getElement("#item-form", HTMLFormElement),
-        itemInput: getElement("#item-input", HTMLInputElement),
-        itemList: getElement("#item-list", HTMLUListElement),
-        navLinks: document.querySelectorAll(".nav a"),
-        saveState: getElement("#save-state", HTMLElement),
-        themeSelect: getElement("#theme-select", HTMLSelectElement),
-        title: getElement(".topbar h1", HTMLHeadingElement),
+        bestScore: getElement("#best-score", HTMLElement),
+        canvas: getElement("#hole-stage", HTMLCanvasElement),
+        combo: getElement("#combo", HTMLElement),
+        resetButton: getElement("#reset-run", HTMLButtonElement),
+        score: getElement("#score", HTMLElement),
+        status: getElement("#status", HTMLElement),
+    };
+}
+function randomBetween(min, max) {
+    return min + Math.random() * (max - min);
+}
+function createDisc(id, width, height) {
+    const radius = randomBetween(8, 28);
+    const fromTop = Math.random() > 0.22;
+    return {
+        id,
+        x: randomBetween(radius, width - radius),
+        y: fromTop ? -radius : randomBetween(radius, height - radius),
+        radius,
+        speed: randomBetween(0.9, 2.9),
+        color: ["#ffcf56", "#ff6b6b", "#6ee7b7", "#8ab4ff", "#f59af2"][id % 5] ?? "#ffffff",
     };
 }
 function initializeApp() {
     initializeGoogleAnalytics();
-    const defaultState = createDefaultState();
     const elements = getElements();
-    let state = parseStoredState(localStorage.getItem(storageKey), defaultState);
-    let saveTimer;
-    function saveState() {
-        localStorage.setItem(storageKey, JSON.stringify(state));
-        elements.saveState.textContent = "Saved locally";
-        window.clearTimeout(saveTimer);
-        saveTimer = window.setTimeout(() => {
-            elements.saveState.textContent = "Changes autosave";
-        }, 1600);
+    const canvasContext = elements.canvas.getContext("2d");
+    if (!canvasContext)
+        throw new Error("Canvas rendering context unavailable");
+    const context = canvasContext;
+    let width = 0;
+    let height = 0;
+    let pixelRatio = 1;
+    let discId = 0;
+    let discs = [];
+    let hole = createInitialHole(1, 1, parseBestScore(localStorage.getItem(storageKey)));
+    let pointerActive = false;
+    let lastFrame = performance.now();
+    function resizeStage() {
+        const rect = elements.canvas.getBoundingClientRect();
+        pixelRatio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+        width = Math.max(320, rect.width);
+        height = Math.max(360, rect.height);
+        elements.canvas.width = Math.round(width * pixelRatio);
+        elements.canvas.height = Math.round(height * pixelRatio);
+        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        hole = clampHoleToScreen({ ...hole, radius: Math.max(36, Math.min(width, height) * 0.085) }, width, height);
+        while (discs.length < 24)
+            discs.push(createDisc(discId++, width, height));
     }
-    function applyTheme() {
-        document.documentElement.dataset.theme = state.theme;
+    function setHoleFromClient(clientX, clientY) {
+        const rect = elements.canvas.getBoundingClientRect();
+        hole = clampHoleToScreen({ ...hole, x: clientX - rect.left, y: clientY - rect.top }, width, height);
+        pointerActive = true;
     }
-    function renderItems() {
-        elements.itemList.replaceChildren();
-        if (state.items.length === 0) {
-            const emptyState = document.createElement("p");
-            emptyState.className = "empty-state";
-            emptyState.textContent = "No items yet. Add one to start shaping this template.";
-            elements.itemList.append(emptyState);
-            return;
+    function resetRun() {
+        const bestScore = hole.bestScore;
+        hole = createInitialHole(width, height, bestScore);
+        discs = Array.from({ length: 24 }, () => createDisc(discId++, width, height));
+        elements.status.textContent = "Move pointer. Be hole.";
+    }
+    function saveBestScore() {
+        localStorage.setItem(storageKey, String(hole.bestScore));
+    }
+    function updateHud() {
+        elements.score.textContent = String(hole.score);
+        elements.bestScore.textContent = String(hole.bestScore);
+        elements.combo.textContent = `${hole.combo.toFixed(1)}x`;
+    }
+    function updateDiscs(delta) {
+        const fallScale = Math.min(2.8, delta / 16.67);
+        discs = discs.flatMap((disc) => {
+            const nextDisc = {
+                ...disc,
+                y: disc.y + disc.speed * fallScale,
+                x: disc.x + Math.sin((disc.y + disc.id * 17) * 0.016) * 0.42 * fallScale,
+            };
+            if (isDiscConsumed(hole, nextDisc)) {
+                hole = consumeDisc(hole, nextDisc);
+                saveBestScore();
+                return [createDisc(discId++, width, height)];
+            }
+            if (nextDisc.y - nextDisc.radius > height) {
+                hole = { ...hole, combo: Math.max(1, hole.combo - 0.35) };
+                return [createDisc(discId++, width, height)];
+            }
+            return [nextDisc];
+        });
+    }
+    function drawBackground() {
+        const gradient = context.createLinearGradient(0, 0, width, height);
+        gradient.addColorStop(0, "#f5e7d1");
+        gradient.addColorStop(0.5, "#c9e8f2");
+        gradient.addColorStop(1, "#f4b6b0");
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, width, height);
+        context.fillStyle = "rgba(255, 255, 255, 0.42)";
+        for (let i = 0; i < 7; i += 1) {
+            context.beginPath();
+            context.arc(width * (0.12 + i * 0.14), height * 0.18, 34 + i * 6, 0, Math.PI * 2);
+            context.fill();
         }
-        state.items.forEach((item) => {
-            const row = document.createElement("li");
-            row.className = "item-row";
-            row.dataset.done = String(item.done);
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.checked = item.done;
-            checkbox.ariaLabel = `Mark ${item.text} complete`;
-            checkbox.addEventListener("change", () => {
-                state = updateItem(state, item.id, { done: checkbox.checked });
-                saveState();
-                render();
-            });
-            const label = document.createElement("span");
-            label.textContent = item.text;
-            const removeButton = document.createElement("button");
-            removeButton.className = "icon-button";
-            removeButton.type = "button";
-            removeButton.ariaLabel = `Remove ${item.text}`;
-            removeButton.textContent = "x";
-            removeButton.addEventListener("click", () => {
-                state = removeItem(state, item.id);
-                saveState();
-                render();
-            });
-            row.append(checkbox, label, removeButton);
-            elements.itemList.append(row);
-        });
     }
-    function render() {
-        document.title = `${state.appName} App Template`;
-        elements.title.textContent = state.appName;
-        elements.appNameInput.value = state.appName;
-        elements.themeSelect.value = state.theme;
-        elements.itemCount.textContent = String(state.items.length);
-        applyTheme();
-        renderItems();
+    function drawDiscs() {
+        for (const disc of discs) {
+            context.beginPath();
+            context.fillStyle = disc.color;
+            context.arc(disc.x, disc.y, disc.radius, 0, Math.PI * 2);
+            context.fill();
+            context.lineWidth = 3;
+            context.strokeStyle = "rgba(255, 255, 255, 0.72)";
+            context.stroke();
+        }
     }
-    function updateCurrentNavLink() {
-        const currentHash = window.location.hash || "#overview";
-        elements.navLinks.forEach((link) => {
-            link.setAttribute("aria-current", link.getAttribute("href") === currentHash ? "page" : "false");
-        });
+    function drawHole() {
+        const glow = context.createRadialGradient(hole.x, hole.y, hole.radius * 0.25, hole.x, hole.y, hole.radius * 1.9);
+        glow.addColorStop(0, "rgba(0, 0, 0, 0.96)");
+        glow.addColorStop(0.46, "rgba(0, 0, 0, 0.92)");
+        glow.addColorStop(0.58, "rgba(116, 36, 255, 0.62)");
+        glow.addColorStop(0.8, "rgba(255, 107, 107, 0.2)");
+        glow.addColorStop(1, "rgba(255, 255, 255, 0)");
+        context.beginPath();
+        context.fillStyle = glow;
+        context.arc(hole.x, hole.y, hole.radius * 1.9, 0, Math.PI * 2);
+        context.fill();
+        context.beginPath();
+        context.fillStyle = "#050505";
+        context.arc(hole.x, hole.y, hole.radius, 0, Math.PI * 2);
+        context.fill();
+        context.beginPath();
+        context.lineWidth = 5;
+        context.strokeStyle = "rgba(255, 255, 255, 0.85)";
+        context.arc(hole.x, hole.y, hole.radius * 1.06, 0.25, Math.PI * 1.6);
+        context.stroke();
     }
-    elements.itemForm.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const text = elements.itemInput.value.trim();
-        if (!text)
-            return;
-        state = addItem(state, text);
-        saveState();
-        render();
-        elements.itemInput.value = "";
-        elements.itemInput.focus();
+    function frame(now) {
+        const delta = now - lastFrame;
+        lastFrame = now;
+        if (!pointerActive) {
+            const drift = now * 0.001;
+            hole = clampHoleToScreen({
+                ...hole,
+                x: width / 2 + Math.cos(drift * 0.8) * width * 0.18,
+                y: height / 2 + Math.sin(drift) * height * 0.14,
+            }, width, height);
+        }
+        updateDiscs(delta);
+        drawBackground();
+        drawDiscs();
+        drawHole();
+        updateHud();
+        requestAnimationFrame(frame);
+    }
+    elements.canvas.addEventListener("pointerdown", (event) => {
+        elements.canvas.setPointerCapture(event.pointerId);
+        setHoleFromClient(event.clientX, event.clientY);
+        elements.status.textContent = "You are hole.";
     });
-    elements.clearItemsButton.addEventListener("click", () => {
-        state = clearDoneItems(state);
-        saveState();
-        render();
+    elements.canvas.addEventListener("pointermove", (event) => {
+        setHoleFromClient(event.clientX, event.clientY);
     });
-    elements.appNameInput.addEventListener("input", () => {
-        state = { ...state, appName: elements.appNameInput.value.trim() || "Cordia" };
-        saveState();
-        render();
+    elements.canvas.addEventListener("pointerleave", () => {
+        pointerActive = false;
+        elements.status.textContent = "Return pointer to regain hole.";
     });
-    elements.themeSelect.addEventListener("change", () => {
-        state = { ...state, theme: elements.themeSelect.value };
-        saveState();
-        render();
-    });
-    window.addEventListener("hashchange", updateCurrentNavLink);
-    render();
-    updateCurrentNavLink();
+    elements.resetButton.addEventListener("click", resetRun);
+    window.addEventListener("resize", resizeStage);
+    resizeStage();
+    resetRun();
+    updateHud();
+    requestAnimationFrame(frame);
 }
 if (typeof document !== "undefined") {
     initializeApp();

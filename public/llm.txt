@@ -1,6 +1,6 @@
-# Cordia App Template
+# Hole
 
-Cordia App Template is a static browser-only web application template ready for static hosting.
+Hole is a static browser game where pointer or touch movement controls a black hole on the screen.
 
 Creator: cordia.molten.bot
 Creator URL: https://cordia.molten.bot
@@ -12,4 +12,4 @@ Primary files:
 - /global.css
 - /app.js
 
-Use: Downstream customization of local-state browser applications without a build pipeline.
+Use: Move the hole through falling discs, consume them, build score, and keep best score locally.

@@ -1,14 +1,14 @@
-# Cordia Web Blank
+# Hole
 
-Static browser-only web app template for fast downstream customization.
+Static browser game where pointer or touch movement controls a black hole. Eat falling discs, grow score, and keep best score locally.
 
 ## Structure
 
 - `public/index.html` - app markup and deploy entry point
 - `public/global.css` - global styling
-- `src/app.ts` - typed browser-only application source
-- `public/app.js` - compiled browser application logic
-- `public/_redirects` - Cloudflare Pages SPA fallback
+- `src/app.ts` - typed browser-only game source
+- `public/app.js` - compiled browser game logic
+- `public/_redirects` - static host SPA fallback
 - `public/_headers` - basic static security headers
 
 ## Run locally
@@ -22,12 +22,3 @@ python3 -m http.server 4173 --directory public
 ```
 
 Then open `http://localhost:4173`.
-
-## Deploy on Cloudflare Pages
-
-Use these project settings:
-
-- Build command: `npm run build`
-- Build output directory: `public`
-
-This template does not require bundling or server functions.
