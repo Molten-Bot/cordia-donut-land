@@ -286,57 +286,8 @@ function drawIsoBlock(ctx, x, y, width, depth, height, color) {
     ctx.fill();
 }
 function drawCityStage(ctx, width, height) {
-    const sky = ctx.createLinearGradient(0, 0, 0, height);
-    sky.addColorStop(0, "#27d27f");
-    sky.addColorStop(0.58, "#30f198");
-    sky.addColorStop(1, "#20d979");
-    ctx.fillStyle = sky;
+    ctx.fillStyle = "#27d27f";
     ctx.fillRect(0, 0, width, height);
-    const horizon = height * 0.36;
-    ctx.fillStyle = "rgba(25,133,99,0.12)";
-    ctx.fillRect(0, horizon, width, height * 0.2);
-    for (let i = -2; i < 18; i += 1) {
-        const x = ((i * 124) % (width + 220)) - 90;
-        const blockHeight = height * (0.08 + ((i + 5) % 4) * 0.025);
-        drawIsoBlock(ctx, x, horizon + height * 0.1, 54, 30, blockHeight, ["#5667b8", "#e65f59", "#f6c64f", "#4fb8a7"][Math.abs(i) % 4]);
-    }
-    const laneY = height * gameplayLaneY;
-    const landTop = height * playableMinY;
-    const landBottom = height * playableMaxY;
-    for (let row = 0; row < 4; row += 1) {
-        for (let col = -3; col < 8; col += 1) {
-            const x = ((col * 164 + row * 58) % (width + 260)) - 130;
-            const y = laneY - 104 + row * 58;
-            drawIsoDiamond(ctx, x, y, 116, 48, row % 2 === 0 ? "rgba(255,255,255,0.08)" : "rgba(16,137,90,0.14)");
-        }
-    }
-    ctx.fillStyle = "rgba(255,255,255,0.12)";
-    for (let row = 0; row < 5; row += 1) {
-        const y = landTop + ((landBottom - landTop) / 4) * row;
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.quadraticCurveTo(width * 0.5, y - 42, width, y + 6);
-        ctx.strokeStyle = row === 2 ? "rgba(9,104,77,0.28)" : "rgba(9,104,77,0.14)";
-        ctx.lineWidth = row === 2 ? 3 : 2;
-        ctx.stroke();
-    }
-    ctx.strokeStyle = "rgba(9,104,77,0.28)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(0, laneY + 8);
-    ctx.quadraticCurveTo(width * 0.5, laneY - 68, width, laneY + 12);
-    ctx.stroke();
-    for (let i = -2; i < 15; i += 1) {
-        const x = ((i * 132) % (width + 180)) - 90;
-        const y = laneY + 58 + ((i % 3) * 22);
-        ctx.fillStyle = i % 2 === 0 ? "#10b56a" : "#13c675";
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + 16, y - 54);
-        ctx.lineTo(x + 25, y);
-        ctx.closePath();
-        ctx.fill();
-    }
 }
 function itemScreenBox(item, width, height) {
     const x = item.x * width;
