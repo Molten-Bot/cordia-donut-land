@@ -128,6 +128,23 @@ test("city items generally graduate in size and never exceed maximum hole size",
   );
 });
 
+test("spawned item radii stay within real hole growth for each level", () => {
+  const items = createCityItems();
+  let state = createDefaultState();
+
+  for (let levelIndex = 0; levelIndex < maxLevel; levelIndex += 1) {
+    const levelItems = items.slice(levelIndex * 9, levelIndex * 9 + 9);
+
+    for (const item of levelItems.slice(0, itemsPerLevel)) {
+      assert.ok(item.radius <= getHoleRadius(state));
+      state = collectItem(state, item.radius);
+    }
+
+    const holeAfterRequiredItems = getHoleRadius(state);
+    assert.ok(levelItems.slice(itemsPerLevel).every((item) => item.radius <= holeAfterRequiredItems));
+  }
+});
+
 test("city items spawn randomly across the playable land plane", () => {
   const items = createCityItems();
   const starterItems = items.slice(0, itemsPerLevel);

@@ -131,13 +131,13 @@ export function getLevel(state: GameState): Level {
 export function getProgressionItemRadius(itemIndex: number): number {
   const clampedIndex = Math.min(Math.max(Math.floor(itemIndex), 0), maxRunItems - 1);
   const progress = clampedIndex / (maxRunItems - 1);
-  return minItemRadius + (maxItemRadius - minItemRadius) * progress ** 1.55;
+  return minItemRadius + (maxItemRadius - minItemRadius) * progress ** 3;
 }
 
 export function getGrowthWeightForItemRadius(itemRadius: number): number {
   const clampedRadius = Math.min(Math.max(itemRadius, minItemRadius), maxItemRadius);
   const sizeProgress = (clampedRadius - minItemRadius) / (maxItemRadius - minItemRadius);
-  return 0.22 + sizeProgress ** 2.35 * 4.8;
+  return 0.22 + sizeProgress ** 0.7 * 4.8;
 }
 
 const progressionGrowthWeightTotal = Array.from({ length: maxRunItems }, (_, index) =>
