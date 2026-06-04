@@ -1,6 +1,6 @@
-# Donut land
+# City Hole
 
-Donut land is a static browser game about collecting donuts, snacks, and level wins.
+City Hole is a static full-screen browser game about swallowing smaller city objects and growing through ten levels.
 
 Creator: cordia.molten.bot
 Creator URL: https://cordia.molten.bot
@@ -12,4 +12,4 @@ Primary files:
 - /global.css
 - /app.js
 
-Use: Playful local-state donut collection game.
+Use: Keyboard and touch arcade game with local run progress.

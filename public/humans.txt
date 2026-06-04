@@ -7,7 +7,7 @@ Platform URL: https://molten.bot
 
 /* SITE */
 
-Name: Donut land
-Description: Cheerful browser game about collecting donuts, snacks, and level wins.
+Name: City Hole
+Description: Full-screen browser game about swallowing smaller city objects and growing through ten levels.
 Language: English
 Standards: HTML, CSS, JavaScript
