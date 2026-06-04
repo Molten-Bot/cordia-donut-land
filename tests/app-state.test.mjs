@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  canSwallowItem,
   collectItem,
   createCityItems,
   createDefaultState,
@@ -93,6 +94,16 @@ test("starter items spawn on the hole lane so they are reachable", () => {
 
   assert.ok(starterItems.every((item) => item.y === gameplayLaneY));
   assert.ok(starterItems.every((item) => item.radius <= startHoleRadius));
+});
+
+test("starter item collision allows reachable overlap before center alignment", () => {
+  const [starterItem] = createCityItems();
+  const oldCenterOnlyReach = startHoleRadius * 0.86;
+  const overlapDistance = oldCenterOnlyReach + 1;
+
+  assert.ok(starterItem);
+  assert.ok(canSwallowItem(starterItem.radius, startHoleRadius, overlapDistance));
+  assert.equal(canSwallowItem(startHoleRadius + 1, startHoleRadius, 0), false);
 });
 
 test("resetRun preserves best score and quiet mode", () => {
