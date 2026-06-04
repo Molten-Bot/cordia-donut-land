@@ -213,16 +213,23 @@ function makeItem(id, x, y, radius) {
 }
 export function createCityItems() {
     const items = [];
+    let simulatedState = createDefaultState();
     let id = 0;
     for (let levelIndex = 0; levelIndex < maxLevel; levelIndex += 1) {
         const level = levels[levelIndex];
         const sectionStart = 260 + levelIndex * 720;
+        let holeAfterRequiredItems = getHoleRadius(simulatedState);
         for (let offset = 0; offset < 9; offset += 1) {
             const itemProgress = levelIndex * itemsPerLevel + Math.min(offset, itemsPerLevel - 1) / 1.25;
             const graduatedRadius = getProgressionItemRadius(itemProgress) + offset * 0.22;
-            const radius = Math.min(Math.max(minItemRadius, graduatedRadius), level.maxRadius, maxItemRadius);
+            const availableHoleRadius = offset < itemsPerLevel ? getHoleRadius(simulatedState) : holeAfterRequiredItems;
+            const radius = Math.min(Math.max(minItemRadius, graduatedRadius), availableHoleRadius, level.maxRadius, maxItemRadius);
             items.push(makeItem(id, sectionStart + 36 + Math.random() * 612, playableMinY + Math.random() * (playableMaxY - playableMinY), radius));
             id += 1;
+            if (offset < itemsPerLevel) {
+                simulatedState = collectItem(simulatedState, radius);
+                holeAfterRequiredItems = getHoleRadius(simulatedState);
+            }
         }
     }
     return items;
