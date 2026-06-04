@@ -8,6 +8,8 @@ export const itemsPerLevel = 5;
 export const startHoleRadius = 20;
 export const growthPerItem = 4;
 export const gameplayLaneY = 0.74;
+export const playableMinY = 0.52;
+export const playableMaxY = 0.9;
 
 export type CityItemKind =
   | "trash"
@@ -59,6 +61,7 @@ interface Hole {
 interface PointerState {
   active: boolean;
   x: number;
+  y: number;
 }
 
 declare global {
@@ -94,6 +97,7 @@ const itemKinds: CityItemKind[] = [
 
 const palette = ["#e04f39", "#f6d83f", "#2f9a88", "#5a78d6", "#8d58a8", "#3f4248", "#f6efe4"];
 const shadow = "rgba(24,42,38,0.22)";
+const playableRows = [playableMinY, 0.62, gameplayLaneY, 0.83, playableMaxY];
 
 export function createDefaultState(): GameState {
   return {
@@ -250,12 +254,13 @@ export function createCityItems(): CityItem[] {
     for (let offset = 0; offset < 9; offset += 1) {
       const graduatedRadius = level.minRadius * 0.42 + offset * 2.6 + levelIndex * 1.8;
       const radius = Math.min(Math.max(7, graduatedRadius), level.maxRadius - 2, maxHoleRadius);
-      const lane = offset % 3;
+      const lane = offset % playableRows.length;
+      const laneY = playableRows[lane]!;
       items.push(
         makeItem(
           id,
           sectionStart + offset * 74 + (lane === 1 ? 18 : 0),
-          gameplayLaneY,
+          laneY,
           radius,
         ),
       );
@@ -344,6 +349,8 @@ function drawCityStage(ctx: CanvasRenderingContext2D, width: number, height: num
   }
 
   const laneY = height * gameplayLaneY;
+  const landTop = height * playableMinY;
+  const landBottom = height * playableMaxY;
   ctx.save();
   ctx.translate(width / 2, laneY + height * 0.03);
   ctx.scale(1, 0.46);
@@ -359,6 +366,17 @@ function drawCityStage(ctx: CanvasRenderingContext2D, width: number, height: num
       const y = laneY - 104 + row * 58;
       drawIsoDiamond(ctx, x, y, 116, 48, row % 2 === 0 ? "rgba(255,255,255,0.08)" : "rgba(16,137,90,0.14)");
     }
+  }
+
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  for (let row = 0; row < 5; row += 1) {
+    const y = landTop + ((landBottom - landTop) / 4) * row;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.quadraticCurveTo(width * 0.5, y - 42, width, y + 6);
+    ctx.strokeStyle = row === 2 ? "rgba(9,104,77,0.28)" : "rgba(9,104,77,0.14)";
+    ctx.lineWidth = row === 2 ? 3 : 2;
+    ctx.stroke();
   }
 
   ctx.strokeStyle = "rgba(9,104,77,0.28)";
@@ -615,7 +633,7 @@ function initializeGame() {
   let state = parseStoredState(localStorage.getItem(storageKey), defaultState);
   let items = createCityItems();
   const keys = new Set<string>();
-  const pointer: PointerState = { active: false, x: 0 };
+  const pointer: PointerState = { active: false, x: 0, y: 0 };
   const hole: Hole = {
     x: Math.max(120, window.innerWidth * 0.5),
     y: 0,
@@ -636,8 +654,9 @@ function initializeGame() {
     canvas.style.width = `${window.innerWidth}px`;
     canvas.style.height = `${window.innerHeight}px`;
     context.setTransform(scale, 0, 0, scale, 0, 0);
-    hole.y = window.innerHeight * gameplayLaneY;
+    if (hole.y === 0) hole.y = window.innerHeight * gameplayLaneY;
     hole.x = Math.max(window.innerWidth * 0.22, Math.min(window.innerWidth * 0.78, hole.x));
+    hole.y = Math.max(window.innerHeight * playableMinY, Math.min(window.innerHeight * playableMaxY, hole.y));
   }
 
   function resetWorldIfComplete() {
@@ -647,6 +666,7 @@ function initializeGame() {
     state = resetRun(state);
     items = createCityItems();
     hole.x = window.innerWidth * 0.5;
+    hole.y = window.innerHeight * gameplayLaneY;
     cameraX = 0;
     saveState();
   }
@@ -670,24 +690,32 @@ function initializeGame() {
 
   function update(delta: number) {
     const width = window.innerWidth;
-    const forward = hole.speed * delta;
-    cameraX += forward;
+    const height = window.innerHeight;
 
-    let movement = 0;
-    if (keys.has("ArrowRight")) movement += 1;
-    if (keys.has("ArrowLeft")) movement -= 1;
+    let movementX = 0;
+    let movementY = 0;
+    if (keys.has("ArrowRight")) movementX += 1;
+    if (keys.has("ArrowLeft")) movementX -= 1;
+    if (keys.has("ArrowDown")) movementY += 1;
+    if (keys.has("ArrowUp")) movementY -= 1;
     if (pointer.active) {
-      const target = pointer.x;
-      movement += Math.max(-1, Math.min(1, (target - hole.x) / 80));
+      movementX += Math.max(-1, Math.min(1, (pointer.x - hole.x) / 80));
+      movementY += Math.max(-1, Math.min(1, (pointer.y - hole.y) / 80));
     }
 
-    hole.x += movement * 260 * delta;
-    hole.x += forward * 0.18;
+    const diagonalScale = movementX !== 0 && movementY !== 0 ? Math.SQRT1_2 : 1;
+    hole.x += movementX * hole.speed * 1.65 * diagonalScale * delta;
+    hole.y += movementY * hole.speed * 1.65 * diagonalScale * delta;
     hole.x = Math.max(width * 0.12, Math.min(width * 0.88, hole.x));
+    hole.y = Math.max(height * playableMinY, Math.min(height * playableMaxY, hole.y));
 
     if (hole.x > width * 0.68) {
       cameraX += (hole.x - width * 0.68) * 0.035;
       hole.x -= (hole.x - width * 0.68) * 0.025;
+    } else if (hole.x < width * 0.28 && cameraX > 0) {
+      const shift = Math.min(cameraX, (width * 0.28 - hole.x) * 0.035);
+      cameraX -= shift;
+      hole.x += shift * 0.72;
     }
 
     eatCollisions();
@@ -715,7 +743,7 @@ function initializeGame() {
 
   window.addEventListener("resize", resize);
   window.addEventListener("keydown", (event) => {
-    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault();
       keys.add(event.key);
     }
@@ -726,11 +754,13 @@ function initializeGame() {
   canvas.addEventListener("pointerdown", (event) => {
     pointer.active = true;
     pointer.x = event.clientX;
+    pointer.y = event.clientY;
     canvas.setPointerCapture(event.pointerId);
   });
   canvas.addEventListener("pointermove", (event) => {
     if (!pointer.active) return;
     pointer.x = event.clientX;
+    pointer.y = event.clientY;
   });
   canvas.addEventListener("pointerup", () => {
     pointer.active = false;
