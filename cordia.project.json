@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "generatedBy": "cordia",
+  "updatedAt": "2026-06-04T04:06:19.965Z",
+  "project": {
+    "id": "donut-land",
+    "handle": "donut-land",
+    "title": "Donut land 🍩",
+    "summary": "This game is a fun donut loving game, that features levels food and fun!",
+    "url": "https://cordia.molten.bot/project/donut-land"
+  },
+  "repo": {
+    "owner": "Molten-Bot",
+    "name": "cordia-donut-land",
+    "fullName": "Molten-Bot/cordia-donut-land"
+  }
+}
