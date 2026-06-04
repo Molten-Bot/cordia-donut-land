@@ -20,7 +20,9 @@ import {
   maxLevel,
   maxRunItems,
   parseStoredState,
+  playableMaxX,
   playableMaxY,
+  playableMinX,
   playableMinY,
   resetRun,
   startHoleRadius,
@@ -145,15 +147,19 @@ test("spawned item radii stay within real hole growth for each level", () => {
   }
 });
 
-test("city items spawn randomly across the playable land plane", () => {
+test("city items initialize across the playable land plane", () => {
   const items = createCityItems();
   const starterItems = items.slice(0, itemsPerLevel);
 
+  assert.ok(items.every((item) => item.x >= playableMinX && item.x <= playableMaxX));
   assert.ok(items.every((item) => item.y >= playableMinY && item.y <= playableMaxY));
-  assert.ok(items.every((item) => item.x >= 296));
   assert.ok(new Set(items.map((item) => item.x)).size > maxLevel * itemsPerLevel);
   assert.ok(new Set(starterItems.map((item) => item.y)).size > 1);
   assert.ok(starterItems.every((item) => item.radius <= startHoleRadius));
+  assert.deepEqual(
+    createCityItems().map((item) => [item.x, item.y, item.radius]),
+    items.map((item) => [item.x, item.y, item.radius]),
+  );
 });
 
 test("starter item collision allows reachable overlap before center alignment", () => {
