@@ -7,7 +7,10 @@ export const maxLevel = 10;
 export const itemsPerLevel = 5;
 export const startHoleRadius = 10;
 export const maxHoleRadius = 38;
-export const growthPerItem = (maxHoleRadius - startHoleRadius) / (maxLevel * itemsPerLevel);
+export const maxRunItems = maxLevel * itemsPerLevel;
+export const growthPerItem = (maxHoleRadius - startHoleRadius) / maxRunItems;
+export const minItemRadius = 7;
+export const maxItemRadius = maxHoleRadius - 2;
 export const gameplayLaneY = 0.74;
 export const playableMinY = 0.52;
 export const playableMaxY = 0.9;
@@ -36,6 +39,7 @@ export interface GameState {
   level: number;
   eaten: number;
   totalEaten: number;
+  totalGrowth: number;
   bestScore: number;
   muted: boolean;
 }
@@ -74,11 +78,11 @@ declare global {
 
 export const levels: Level[] = Array.from({ length: maxLevel }, (_, index) => {
   const id = index + 1;
-  const minRadius = startHoleRadius + index * itemsPerLevel * growthPerItem;
+  const minRadius = getProgressionItemRadius(index * itemsPerLevel);
   return {
     id,
     minRadius,
-    maxRadius: Math.min(minRadius + itemsPerLevel * growthPerItem, maxHoleRadius),
+    maxRadius: Math.min(getProgressionItemRadius((index + 1) * itemsPerLevel), maxHoleRadius),
   };
 });
 
@@ -105,6 +109,7 @@ export function createDefaultState(): GameState {
     level: 1,
     eaten: 0,
     totalEaten: 0,
+    totalGrowth: 0,
     bestScore: 0,
     muted: false,
   };
@@ -123,8 +128,41 @@ export function getLevel(state: GameState): Level {
   return levels[state.level - 1] ?? levels[0]!;
 }
 
+export function getProgressionItemRadius(itemIndex: number): number {
+  const clampedIndex = Math.min(Math.max(Math.floor(itemIndex), 0), maxRunItems - 1);
+  const progress = clampedIndex / (maxRunItems - 1);
+  return minItemRadius + (maxItemRadius - minItemRadius) * progress ** 1.55;
+}
+
+export function getGrowthWeightForItemRadius(itemRadius: number): number {
+  const clampedRadius = Math.min(Math.max(itemRadius, minItemRadius), maxItemRadius);
+  const sizeProgress = (clampedRadius - minItemRadius) / (maxItemRadius - minItemRadius);
+  return 0.22 + sizeProgress ** 2.35 * 4.8;
+}
+
+const progressionGrowthWeightTotal = Array.from({ length: maxRunItems }, (_, index) =>
+  getGrowthWeightForItemRadius(getProgressionItemRadius(index)),
+).reduce((total, weight) => total + weight, 0);
+
+export function getGrowthForItemRadius(itemRadius: number): number {
+  return ((maxHoleRadius - startHoleRadius) * getGrowthWeightForItemRadius(itemRadius)) / progressionGrowthWeightTotal;
+}
+
+export function deriveGrowthFromEatenCount(totalEaten: number): number {
+  const count = Math.min(cleanCount(totalEaten), maxRunItems);
+  let totalGrowth = 0;
+  for (let index = 0; index < count; index += 1) {
+    totalGrowth += getGrowthForItemRadius(getProgressionItemRadius(index));
+  }
+  return Math.min(totalGrowth, maxHoleRadius - startHoleRadius);
+}
+
 export function getHoleRadius(state: GameState): number {
-  return Math.min(startHoleRadius + state.totalEaten * growthPerItem, maxHoleRadius);
+  const totalGrowth =
+    typeof state.totalGrowth === "number" && Number.isFinite(state.totalGrowth)
+      ? Math.max(state.totalGrowth, 0)
+      : deriveGrowthFromEatenCount(state.totalEaten);
+  return Math.min(startHoleRadius + totalGrowth, maxHoleRadius);
 }
 
 export function parseStoredState(storedState: string | null, defaultState: GameState): GameState {
@@ -135,12 +173,17 @@ export function parseStoredState(storedState: string | null, defaultState: GameS
     const totalEaten = cleanCount(parsed.totalEaten);
     const levelFromTotal = Math.min(Math.floor(totalEaten / itemsPerLevel) + 1, maxLevel);
     const level = Math.max(clampLevel(parsed.level), levelFromTotal);
+    const totalGrowth =
+      typeof parsed.totalGrowth === "number" && Number.isFinite(parsed.totalGrowth)
+        ? Math.min(Math.max(parsed.totalGrowth, 0), maxHoleRadius - startHoleRadius)
+        : deriveGrowthFromEatenCount(totalEaten);
 
     return {
       release: "0",
       level,
       eaten: Math.min(cleanCount(parsed.eaten), itemsPerLevel - 1),
       totalEaten,
+      totalGrowth,
       bestScore: cleanCount(parsed.bestScore),
       muted: typeof parsed.muted === "boolean" ? parsed.muted : defaultState.muted,
     };
@@ -149,14 +192,20 @@ export function parseStoredState(storedState: string | null, defaultState: GameS
   }
 }
 
-export function collectItem(state: GameState): GameState {
+export function collectItem(state: GameState, itemRadius = getProgressionItemRadius(state.totalEaten)): GameState {
   const totalEaten = state.totalEaten + 1;
   const level = Math.min(Math.floor(totalEaten / itemsPerLevel) + 1, maxLevel);
+  const currentGrowth =
+    typeof state.totalGrowth === "number" && Number.isFinite(state.totalGrowth)
+      ? Math.max(state.totalGrowth, 0)
+      : deriveGrowthFromEatenCount(state.totalEaten);
+  const totalGrowth = Math.min(currentGrowth + getGrowthForItemRadius(itemRadius), maxHoleRadius - startHoleRadius);
   return {
     ...state,
     level,
     eaten: totalEaten % itemsPerLevel,
     totalEaten,
+    totalGrowth,
     bestScore: Math.max(state.bestScore, totalEaten),
   };
 }
@@ -251,8 +300,9 @@ export function createCityItems(): CityItem[] {
     const sectionStart = 260 + levelIndex * 720;
 
     for (let offset = 0; offset < 9; offset += 1) {
-      const graduatedRadius = level.minRadius * 0.42 + offset * 0.54 + levelIndex * 0.36;
-      const radius = Math.min(Math.max(7, graduatedRadius), level.maxRadius - 2, maxHoleRadius);
+      const itemProgress = levelIndex * itemsPerLevel + Math.min(offset, itemsPerLevel - 1) / 1.25;
+      const graduatedRadius = getProgressionItemRadius(itemProgress) + offset * 0.22;
+      const radius = Math.min(Math.max(minItemRadius, graduatedRadius), level.maxRadius, maxItemRadius);
       items.push(
         makeItem(
           id,
@@ -561,7 +611,7 @@ function initializeGame() {
       const distance = Math.hypot(dx, dy);
       if (canSwallowItem(item.radius, hole.radius, distance)) {
         item.eaten = true;
-        state = collectItem(state);
+        state = collectItem(state, item.radius);
         hole.radius = getHoleRadius(state);
         saveState();
       }

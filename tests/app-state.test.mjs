@@ -7,12 +7,18 @@ import {
   collectItem,
   createCityItems,
   createDefaultState,
+  deriveGrowthFromEatenCount,
+  getGrowthForItemRadius,
+  getGrowthWeightForItemRadius,
   growthPerItem,
   getHoleRadius,
+  getProgressionItemRadius,
   itemsPerLevel,
   levels,
   maxHoleRadius,
+  maxItemRadius,
   maxLevel,
+  maxRunItems,
   parseStoredState,
   playableMaxY,
   playableMinY,
@@ -28,6 +34,7 @@ test("createDefaultState marks release zero and starts level one", () => {
     level: 1,
     eaten: 0,
     totalEaten: 0,
+    totalGrowth: 0,
     bestScore: 0,
     muted: false,
   });
@@ -49,6 +56,7 @@ test("parseStoredState sanitizes stored values and derives progress", () => {
     level: 3,
     eaten: 4,
     totalEaten: 14,
+    totalGrowth: deriveGrowthFromEatenCount(14),
     bestScore: 22,
     muted: true,
   });
@@ -70,26 +78,54 @@ test("collectItem levels up every five swallowed items", () => {
   assert.equal(state.level, 2);
   assert.equal(state.eaten, 0);
   assert.equal(state.totalEaten, 5);
+  assert.equal(state.totalGrowth, deriveGrowthFromEatenCount(5));
   assert.equal(state.bestScore, 5);
 });
 
-test("hole radius grows with swallowed item count", () => {
-  const state = { ...createDefaultState(), totalEaten: 8 };
+test("hole radius grows from accumulated item-size growth", () => {
+  const state = { ...createDefaultState(), totalEaten: 8, totalGrowth: deriveGrowthFromEatenCount(8) };
 
-  assert.equal(getHoleRadius(state), startHoleRadius + 8 * growthPerItem);
-  assert.equal(getHoleRadius({ ...state, totalEaten: maxLevel * itemsPerLevel + 4 }), maxHoleRadius);
+  assert.equal(getHoleRadius(state), startHoleRadius + deriveGrowthFromEatenCount(8));
+  assert.equal(
+    getHoleRadius({ ...state, totalEaten: maxRunItems + 4, totalGrowth: deriveGrowthFromEatenCount(maxRunItems + 4) }),
+    maxHoleRadius,
+  );
+  assert.ok(deriveGrowthFromEatenCount(8) < 8 * growthPerItem);
 });
 
-test("city items graduate in size and never exceed maximum hole size", () => {
+test("larger items produce much larger hole growth near the end", () => {
+  const tinyRadius = getProgressionItemRadius(0);
+  const midRadius = getProgressionItemRadius(Math.floor(maxRunItems / 2));
+  const finalRadius = getProgressionItemRadius(maxRunItems - 1);
+
+  assert.ok(tinyRadius < midRadius);
+  assert.ok(midRadius < finalRadius);
+  assert.ok(getGrowthWeightForItemRadius(tinyRadius) < getGrowthWeightForItemRadius(midRadius));
+  assert.ok(getGrowthWeightForItemRadius(midRadius) < getGrowthWeightForItemRadius(finalRadius));
+  assert.ok(getGrowthForItemRadius(finalRadius) > getGrowthForItemRadius(tinyRadius) * 16);
+});
+
+test("collectItem uses swallowed object size to grow the hole", () => {
+  const smallItemState = collectItem(createDefaultState(), getProgressionItemRadius(0));
+  const largeItemState = collectItem(createDefaultState(), getProgressionItemRadius(maxRunItems - 1));
+
+  assert.ok(largeItemState.totalGrowth > smallItemState.totalGrowth * 16);
+  assert.ok(getHoleRadius(largeItemState) > getHoleRadius(smallItemState));
+});
+
+test("city items generally graduate in size and never exceed maximum hole size", () => {
   const items = createCityItems();
 
   assert.equal(levels.length, maxLevel);
   assert.ok(items.length > maxLevel * itemsPerLevel);
   assert.ok(items[0].radius < items[items.length - 1].radius);
-  assert.equal(levels[levels.length - 1].maxRadius, maxHoleRadius);
-  assert.ok(items.every((item) => item.radius <= maxHoleRadius));
+  assert.equal(levels[levels.length - 1].maxRadius, maxItemRadius);
+  assert.ok(items.every((item) => item.radius < maxHoleRadius));
   assert.ok(items.every((item) => item.width <= item.radius * 2 && item.height <= item.radius * 2));
   assert.ok(items.slice(0, 6).some((item) => ["trash", "shoe", "can", "pet"].includes(item.kind)));
+  assert.ok(
+    items.filter((item, index) => index > 0 && item.radius >= items[index - 1].radius).length > items.length * 0.88,
+  );
 });
 
 test("city items spawn randomly across the playable land plane", () => {
