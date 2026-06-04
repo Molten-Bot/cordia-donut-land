@@ -3,66 +3,98 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
-  addItem,
-  clearDoneItems,
+  advanceLevel,
+  canAdvance,
+  collectFood,
   createDefaultState,
+  getLevel,
   parseStoredState,
-  removeItem,
-  updateItem,
+  resetRun,
 } from "../public/app.js";
 
-test("createDefaultState uses supplied id factory", () => {
-  let nextId = 1;
-  const state = createDefaultState(() => `item-${nextId++}`);
+test("createDefaultState marks release zero and starts level one", () => {
+  const state = createDefaultState();
 
-  assert.deepEqual(
-    state.items.map((item) => item.id),
-    ["item-1", "item-2", "item-3"],
-  );
+  assert.deepEqual(state, {
+    release: "0",
+    level: 1,
+    donuts: 0,
+    treats: { donut: 0, milk: 0, sprinkles: 0 },
+    bestScore: 0,
+    muted: false,
+  });
 });
 
-test("parseStoredState merges valid stored values with defaults", () => {
-  const defaultState = createDefaultState(() => "default-id");
+test("parseStoredState sanitizes stored values", () => {
+  const defaultState = createDefaultState();
   const stored = JSON.stringify({
-    appName: "Typed Cordia",
-    theme: "dark",
-    items: [{ id: "stored-id", text: "Stored item", done: true }],
+    release: "old",
+    level: 99,
+    donuts: 14.8,
+    treats: { donut: 2.2, milk: -4, sprinkles: 1 },
+    bestScore: 22,
+    muted: true,
   });
 
   assert.deepEqual(parseStoredState(stored, defaultState), {
-    appName: "Typed Cordia",
-    theme: "dark",
-    items: [{ id: "stored-id", text: "Stored item", done: true }],
+    release: "0",
+    level: 4,
+    donuts: 14,
+    treats: { donut: 2, milk: 0, sprinkles: 1 },
+    bestScore: 22,
+    muted: true,
   });
 });
 
 test("parseStoredState falls back when stored JSON is invalid", () => {
-  const defaultState = createDefaultState(() => "default-id");
+  const defaultState = createDefaultState();
 
   assert.equal(parseStoredState("{", defaultState), defaultState);
 });
 
-test("item reducers add, update, remove, and clear items immutably", () => {
+test("collectFood updates score, treat totals, and best score immutably", () => {
+  const state = createDefaultState();
+  const collected = collectFood(collectFood(state, "milk"), "sprinkles");
+
+  assert.equal(collected.donuts, 8);
+  assert.equal(collected.bestScore, 8);
+  assert.deepEqual(collected.treats, { donut: 0, milk: 1, sprinkles: 1 });
+  assert.equal(state.donuts, 0);
+});
+
+test("advanceLevel moves forward only after goal", () => {
   const state = {
-    appName: "Cordia",
-    theme: "system",
-    items: [
-      { id: "one", text: "One", done: false },
-      { id: "two", text: "Two", done: true },
-    ],
+    ...createDefaultState(),
+    donuts: getLevel(createDefaultState()).goal,
   };
 
-  const added = addItem(state, "Three", () => "three");
-  const updated = updateItem(added, "one", { done: true });
-  const removed = removeItem(updated, "two");
-  const cleared = clearDoneItems(removed);
+  assert.equal(canAdvance(state), true);
+  assert.deepEqual(advanceLevel(state), {
+    ...state,
+    level: 2,
+    donuts: 0,
+  });
+  assert.equal(advanceLevel(createDefaultState()).level, 1);
+});
 
-  assert.deepEqual(added.items[0], { id: "three", text: "Three", done: false });
-  assert.equal(state.items[0].done, false);
-  assert.deepEqual(
-    cleared.items,
-    [{ id: "three", text: "Three", done: false }],
-  );
+test("resetRun preserves best score and quiet mode", () => {
+  const reset = resetRun({
+    ...createDefaultState(),
+    level: 3,
+    donuts: 12,
+    bestScore: 90,
+    muted: true,
+  });
+
+  assert.equal(reset.level, 1);
+  assert.equal(reset.bestScore, 90);
+  assert.equal(reset.muted, true);
+});
+
+test("release marker reports release zero", async () => {
+  const release = JSON.parse(await readFile("public/release.json", "utf8"));
+
+  assert.deepEqual(release, { release: "0" });
 });
 
 test("served files do not reference disallowed providers or tooling", async () => {

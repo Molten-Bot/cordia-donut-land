@@ -1,35 +1,40 @@
-// Google Analytics default capture for this template.
+// Google Analytics default capture for this static app.
 // Future LLM edits: do not remove this gtag setup unless replacing it with equivalent page analytics capture.
 const googleAnalyticsId = "G-ZKTPLMMFDQ";
-const storageKey = "cordia-template-state";
+const storageKey = "donut-land-state";
 
-type Theme = "system" | "light" | "dark";
+export type FoodKind = "donut" | "milk" | "sprinkles";
 
-export interface Item {
-  id: string;
-  text: string;
-  done: boolean;
+export interface Level {
+  id: number;
+  name: string;
+  goal: number;
+  helper: string;
 }
 
-export interface AppState {
-  appName: string;
-  theme: Theme;
-  items: Item[];
+export interface GameState {
+  release: "0";
+  level: number;
+  donuts: number;
+  treats: Record<FoodKind, number>;
+  bestScore: number;
+  muted: boolean;
 }
-
-type ItemPatch = Partial<Pick<Item, "text" | "done">>;
 
 interface AppElements {
-  appNameInput: HTMLInputElement;
-  clearItemsButton: HTMLButtonElement;
-  itemCount: HTMLElement;
-  itemForm: HTMLFormElement;
-  itemInput: HTMLInputElement;
-  itemList: HTMLUListElement;
-  navLinks: NodeListOf<HTMLAnchorElement>;
-  saveState: HTMLElement;
-  themeSelect: HTMLSelectElement;
+  bestScore: HTMLElement;
+  celebration: HTMLElement;
+  currentLevel: HTMLElement;
+  donutButton: HTMLButtonElement;
+  donutCount: HTMLElement;
+  foodButtons: NodeListOf<HTMLButtonElement>;
+  goalText: HTMLElement;
+  helperText: HTMLElement;
+  levelList: HTMLElement;
+  muteToggle: HTMLInputElement;
+  resetButton: HTMLButtonElement;
   title: HTMLHeadingElement;
+  treatSummary: HTMLElement;
 }
 
 declare global {
@@ -39,78 +44,124 @@ declare global {
   }
 }
 
-function createItem(text: string, done: boolean, idFactory: () => string): Item {
-  return { id: idFactory(), text, done };
-}
+export const levels: Level[] = [
+  { id: 1, name: "Glaze Grove", goal: 12, helper: "Warm glaze drips from every tree." },
+  { id: 2, name: "Sprinkle Skyline", goal: 26, helper: "Catch rainbow crunch before it melts." },
+  { id: 3, name: "Fritter Falls", goal: 44, helper: "Big stacks need quick taps and snacks." },
+  { id: 4, name: "Jelly Moon", goal: 70, helper: "Final feast. Fill moon with donut joy." },
+];
 
-export function createDefaultState(idFactory: () => string = () => crypto.randomUUID()): AppState {
+const foodValues: Record<FoodKind, number> = {
+  donut: 1,
+  milk: 3,
+  sprinkles: 5,
+};
+
+const foodLabels: Record<FoodKind, string> = {
+  donut: "Donuts",
+  milk: "Milk",
+  sprinkles: "Sprinkles",
+};
+
+export function createDefaultState(): GameState {
   return {
-    appName: "Cordia",
-    theme: "system",
-    items: [
-      createItem("Replace starter content", false, idFactory),
-      createItem("Add app-specific data model", false, idFactory),
-      createItem("Publish public folder to your hosting provider", true, idFactory),
-    ],
+    release: "0",
+    level: 1,
+    donuts: 0,
+    treats: { donut: 0, milk: 0, sprinkles: 0 },
+    bestScore: 0,
+    muted: false,
   };
 }
 
-function isTheme(value: unknown): value is Theme {
-  return value === "system" || value === "light" || value === "dark";
+function isFoodKind(value: string): value is FoodKind {
+  return value === "donut" || value === "milk" || value === "sprinkles";
 }
 
-function isItem(value: unknown): value is Item {
+function isTreatRecord(value: unknown): value is Record<FoodKind, number> {
   if (!value || typeof value !== "object") return false;
-  const item = value as Record<string, unknown>;
+  const treats = value as Record<string, unknown>;
   return (
-    typeof item.id === "string" &&
-    typeof item.text === "string" &&
-    typeof item.done === "boolean"
+    typeof treats.donut === "number" &&
+    typeof treats.milk === "number" &&
+    typeof treats.sprinkles === "number"
   );
 }
 
-export function parseStoredState(storedState: string | null, defaultState: AppState): AppState {
+function clampLevel(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value)) return 1;
+  return Math.min(Math.max(value, 1), levels.length);
+}
+
+function cleanCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+}
+
+export function getLevel(state: GameState): Level {
+  const firstLevel = levels[0];
+  if (!firstLevel) {
+    throw new Error("Donut land needs at least one level.");
+  }
+  return levels[state.level - 1] ?? firstLevel;
+}
+
+export function parseStoredState(storedState: string | null, defaultState: GameState): GameState {
   if (!storedState) return defaultState;
 
   try {
     const parsed = JSON.parse(storedState) as Record<string, unknown>;
+    const treats = isTreatRecord(parsed.treats) ? parsed.treats : defaultState.treats;
+
     return {
-      appName: typeof parsed.appName === "string" ? parsed.appName : defaultState.appName,
-      theme: isTheme(parsed.theme) ? parsed.theme : defaultState.theme,
-      items: Array.isArray(parsed.items) && parsed.items.every(isItem) ? parsed.items : defaultState.items,
+      release: "0",
+      level: clampLevel(parsed.level),
+      donuts: cleanCount(parsed.donuts),
+      treats: {
+        donut: cleanCount(treats.donut),
+        milk: cleanCount(treats.milk),
+        sprinkles: cleanCount(treats.sprinkles),
+      },
+      bestScore: cleanCount(parsed.bestScore),
+      muted: typeof parsed.muted === "boolean" ? parsed.muted : defaultState.muted,
     };
   } catch {
     return defaultState;
   }
 }
 
-export function updateItem(state: AppState, id: string, patch: ItemPatch): AppState {
+export function collectFood(state: GameState, food: FoodKind): GameState {
+  const gained = foodValues[food];
+  const donuts = state.donuts + gained;
   return {
     ...state,
-    items: state.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    donuts,
+    bestScore: Math.max(state.bestScore, donuts),
+    treats: {
+      ...state.treats,
+      [food]: state.treats[food] + 1,
+    },
   };
 }
 
-export function removeItem(state: AppState, id: string): AppState {
+export function canAdvance(state: GameState): boolean {
+  return state.donuts >= getLevel(state).goal && state.level < levels.length;
+}
+
+export function advanceLevel(state: GameState): GameState {
+  if (!canAdvance(state)) return state;
   return {
     ...state,
-    items: state.items.filter((item) => item.id !== id),
+    level: state.level + 1,
+    donuts: 0,
   };
 }
 
-export function addItem(
-  state: AppState,
-  text: string,
-  idFactory: () => string = () => crypto.randomUUID(),
-): AppState {
+export function resetRun(state: GameState): GameState {
   return {
-    ...state,
-    items: [createItem(text, false, idFactory), ...state.items],
+    ...createDefaultState(),
+    bestScore: state.bestScore,
+    muted: state.muted,
   };
-}
-
-export function clearDoneItems(state: AppState): AppState {
-  return { ...state, items: state.items.filter((item) => !item.done) };
 }
 
 function initializeGoogleAnalytics() {
@@ -138,16 +189,19 @@ function getElement<T extends Element>(selector: string, type: { new (): T }): T
 
 function getElements(): AppElements {
   return {
-    appNameInput: getElement("#app-name", HTMLInputElement),
-    clearItemsButton: getElement("#clear-items", HTMLButtonElement),
-    itemCount: getElement("#item-count", HTMLElement),
-    itemForm: getElement("#item-form", HTMLFormElement),
-    itemInput: getElement("#item-input", HTMLInputElement),
-    itemList: getElement("#item-list", HTMLUListElement),
-    navLinks: document.querySelectorAll<HTMLAnchorElement>(".nav a"),
-    saveState: getElement("#save-state", HTMLElement),
-    themeSelect: getElement("#theme-select", HTMLSelectElement),
+    bestScore: getElement("#best-score", HTMLElement),
+    celebration: getElement("#celebration", HTMLElement),
+    currentLevel: getElement("#current-level", HTMLElement),
+    donutButton: getElement("#donut-button", HTMLButtonElement),
+    donutCount: getElement("#donut-count", HTMLElement),
+    foodButtons: document.querySelectorAll<HTMLButtonElement>("[data-food]"),
+    goalText: getElement("#goal-text", HTMLElement),
+    helperText: getElement("#helper-text", HTMLElement),
+    levelList: getElement("#level-list", HTMLElement),
+    muteToggle: getElement("#mute-toggle", HTMLInputElement),
+    resetButton: getElement("#reset-run", HTMLButtonElement),
     title: getElement(".topbar h1", HTMLHeadingElement),
+    treatSummary: getElement("#treat-summary", HTMLElement),
   };
 }
 
@@ -157,116 +211,98 @@ function initializeApp() {
   const defaultState = createDefaultState();
   const elements = getElements();
   let state = parseStoredState(localStorage.getItem(storageKey), defaultState);
-  let saveTimer: number | undefined;
 
   function saveState() {
     localStorage.setItem(storageKey, JSON.stringify(state));
-    elements.saveState.textContent = "Saved locally";
-    window.clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(() => {
-      elements.saveState.textContent = "Changes autosave";
-    }, 1600);
   }
 
-  function applyTheme() {
-    document.documentElement.dataset.theme = state.theme;
-  }
+  function renderLevels() {
+    elements.levelList.replaceChildren();
 
-  function renderItems() {
-    elements.itemList.replaceChildren();
+    levels.forEach((level) => {
+      const item = document.createElement("li");
+      item.className = "level-step";
+      item.dataset.current = String(level.id === state.level);
+      item.dataset.done = String(level.id < state.level);
 
-    if (state.items.length === 0) {
-      const emptyState = document.createElement("p");
-      emptyState.className = "empty-state";
-      emptyState.textContent = "No items yet. Add one to start shaping this template.";
-      elements.itemList.append(emptyState);
-      return;
-    }
+      const badge = document.createElement("span");
+      badge.textContent = String(level.id);
 
-    state.items.forEach((item) => {
-      const row = document.createElement("li");
-      row.className = "item-row";
-      row.dataset.done = String(item.done);
+      const copy = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = level.name;
+      const goal = document.createElement("small");
+      goal.textContent = `${level.goal} donut goal`;
+      copy.append(name, goal);
 
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = item.done;
-      checkbox.ariaLabel = `Mark ${item.text} complete`;
-      checkbox.addEventListener("change", () => {
-        state = updateItem(state, item.id, { done: checkbox.checked });
-        saveState();
-        render();
-      });
-
-      const label = document.createElement("span");
-      label.textContent = item.text;
-
-      const removeButton = document.createElement("button");
-      removeButton.className = "icon-button";
-      removeButton.type = "button";
-      removeButton.ariaLabel = `Remove ${item.text}`;
-      removeButton.textContent = "x";
-      removeButton.addEventListener("click", () => {
-        state = removeItem(state, item.id);
-        saveState();
-        render();
-      });
-
-      row.append(checkbox, label, removeButton);
-      elements.itemList.append(row);
+      item.append(badge, copy);
+      elements.levelList.append(item);
     });
   }
 
   function render() {
-    document.title = `${state.appName} App Template`;
-    elements.title.textContent = state.appName;
-    elements.appNameInput.value = state.appName;
-    elements.themeSelect.value = state.theme;
-    elements.itemCount.textContent = String(state.items.length);
-    applyTheme();
-    renderItems();
-  }
+    const level = getLevel(state);
+    const remaining = Math.max(level.goal - state.donuts, 0);
+    const complete = state.donuts >= level.goal;
+    const finalComplete = complete && state.level === levels.length;
 
-  function updateCurrentNavLink() {
-    const currentHash = window.location.hash || "#overview";
-    elements.navLinks.forEach((link) => {
-      link.setAttribute("aria-current", link.getAttribute("href") === currentHash ? "page" : "false");
+    document.title = "Donut land";
+    elements.title.textContent = "Donut land";
+    elements.currentLevel.textContent = `Level ${level.id}: ${level.name}`;
+    elements.donutCount.textContent = String(state.donuts);
+    elements.bestScore.textContent = String(state.bestScore);
+    elements.goalText.textContent = complete ? "Goal reached" : `${remaining} until next level`;
+    elements.helperText.textContent = level.helper;
+    elements.muteToggle.checked = state.muted;
+    elements.treatSummary.textContent = `${foodLabels.donut}: ${state.treats.donut} | ${foodLabels.milk}: ${state.treats.milk} | ${foodLabels.sprinkles}: ${state.treats.sprinkles}`;
+    elements.celebration.textContent = finalComplete
+      ? "Jelly Moon complete. Donut land full."
+      : complete
+        ? "Goal reached. Next level unlocked."
+        : "Tap treats. Feed fun. Climb levels.";
+
+    elements.donutButton.disabled = finalComplete;
+    const donutLabel = elements.donutButton.querySelector("span:last-child");
+    if (donutLabel instanceof HTMLElement) {
+      donutLabel.textContent = finalComplete ? "Feast complete" : "Grab donut";
+    }
+    elements.foodButtons.forEach((button) => {
+      button.disabled = finalComplete;
     });
+
+    renderLevels();
   }
 
-  elements.itemForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const text = elements.itemInput.value.trim();
-    if (!text) return;
-    state = addItem(state, text);
+  function collect(food: FoodKind) {
+    state = collectFood(state, food);
+    if (canAdvance(state)) {
+      state = advanceLevel(state);
+    }
     saveState();
     render();
-    elements.itemInput.value = "";
-    elements.itemInput.focus();
+  }
+
+  elements.donutButton.addEventListener("click", () => collect("donut"));
+
+  elements.foodButtons.forEach((button) => {
+    const food = button.dataset.food;
+    if (!food || !isFoodKind(food)) return;
+    button.addEventListener("click", () => collect(food));
   });
 
-  elements.clearItemsButton.addEventListener("click", () => {
-    state = clearDoneItems(state);
-    saveState();
-    render();
-  });
-
-  elements.appNameInput.addEventListener("input", () => {
-    state = { ...state, appName: elements.appNameInput.value.trim() || "Cordia" };
-    saveState();
-    render();
-  });
-
-  elements.themeSelect.addEventListener("change", () => {
-    state = { ...state, theme: elements.themeSelect.value as Theme };
+  elements.resetButton.addEventListener("click", () => {
+    state = resetRun(state);
     saveState();
     render();
   });
 
-  window.addEventListener("hashchange", updateCurrentNavLink);
+  elements.muteToggle.addEventListener("change", () => {
+    state = { ...state, muted: elements.muteToggle.checked };
+    saveState();
+    render();
+  });
 
   render();
-  updateCurrentNavLink();
 }
 
 if (typeof document !== "undefined") {
