@@ -1,6 +1,6 @@
-# Cordia App Template
+# Donut land
 
-Cordia App Template is a static browser-only web application template ready for static hosting.
+Donut land is a static browser game about collecting donuts, snacks, and level wins.
 
 Creator: cordia.molten.bot
 Creator URL: https://cordia.molten.bot
@@ -12,4 +12,4 @@ Primary files:
 - /global.css
 - /app.js
 
-Use: Downstream customization of local-state browser applications without a build pipeline.
+Use: Playful local-state donut collection game.

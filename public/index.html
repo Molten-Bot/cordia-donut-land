@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
+    <meta name="color-scheme" content="light">
     <meta
       name="description"
-      content="A small browser-only web application template ready for static hosting."
+      content="Donut land is a cheerful browser game about collecting donuts, snacks, and level wins."
     >
-    <title>Cordia App Template</title>
+    <title>Donut land</title>
     <link rel="author" href="/humans.txt" type="text/plain">
     <link rel="alternate" href="/llm.txt" type="text/plain" title="LLM-readable site information">
     <link rel="stylesheet" href="/global.css">
@@ -16,129 +16,89 @@
     <script type="module" src="/app.js"></script>
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main">Skip to game</a>
 
     <div class="app-shell">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">Browser app template</p>
-          <h1>Cordia</h1>
-        </div>
-        <nav class="nav" aria-label="Primary">
-          <a href="#overview" aria-current="page">Overview</a>
-          <a href="#workspace">Workspace</a>
-          <a href="#settings">Settings</a>
-        </nav>
+        <h1>Donut land</h1>
+        <div class="release-pill">Release 0</div>
       </header>
 
-      <main id="main">
-        <section class="hero" id="overview" aria-labelledby="hero-title">
-          <div class="hero-copy">
-            <p class="eyebrow">Static hosting ready starter</p>
-            <h2 id="hero-title">A clean starting point for browser-only apps.</h2>
-            <p>
-              Customize the data model, views, and actions without introducing a
-              build pipeline. State is local by default, markup stays plain, and
-              assets live in one deployable folder.
-            </p>
-            <div class="hero-actions">
-              <a class="button primary" href="#workspace">Open workspace</a>
-              <a class="button secondary" href="#settings">Edit settings</a>
+      <main id="main" class="game-layout">
+        <section class="play-zone" aria-labelledby="game-title">
+          <div class="game-copy">
+            <p class="eyebrow">Food and fun levels</p>
+            <h2 id="game-title">Donut land</h2>
+            <p>Collect sweet food, fill each level goal, and push deeper into Donut land.</p>
+          </div>
+
+          <div class="donut-stage" aria-live="polite">
+            <button class="donut-button" id="donut-button" type="button">
+              <span class="donut-art" aria-hidden="true"></span>
+              <span>Grab donut</span>
+            </button>
+            <div class="score-box">
+              <span id="donut-count">0</span>
+              <small>donuts</small>
             </div>
           </div>
-          <div class="status-panel" aria-label="Application status">
-            <div>
-              <span class="status-dot" aria-hidden="true"></span>
-              <span>Ready for customization</span>
-            </div>
-            <strong id="item-count">0</strong>
-            <span>saved items</span>
+
+          <div class="food-bar" aria-label="Food buttons">
+            <button class="food-card" type="button" data-food="donut">
+              <span aria-hidden="true">D</span>
+              <strong>Donut</strong>
+              <small>+1</small>
+            </button>
+            <button class="food-card" type="button" data-food="milk">
+              <span aria-hidden="true">M</span>
+              <strong>Milk</strong>
+              <small>+3</small>
+            </button>
+            <button class="food-card" type="button" data-food="sprinkles">
+              <span aria-hidden="true">S</span>
+              <strong>Sprinkles</strong>
+              <small>+5</small>
+            </button>
           </div>
         </section>
 
-        <section class="section-grid" id="workspace" aria-labelledby="workspace-title">
-          <div class="panel workspace-panel">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Workspace</p>
-                <h2 id="workspace-title">Starter list</h2>
-              </div>
-              <button class="button secondary" id="clear-items" type="button">Clear done</button>
+        <aside class="side-panel" aria-label="Game status">
+          <section class="panel compact">
+            <p class="eyebrow">Current level</p>
+            <h2 id="current-level">Level 1: Glaze Grove</h2>
+            <p id="helper-text">Warm glaze drips from every tree.</p>
+            <div class="goal-meter">
+              <span id="goal-text">12 until next level</span>
             </div>
+            <p class="celebration" id="celebration">Tap treats. Feed fun. Climb levels.</p>
+          </section>
 
-            <form class="item-form" id="item-form">
-              <label for="item-input">New item</label>
-              <div class="input-row">
-                <input
-                  id="item-input"
-                  name="item"
-                  type="text"
-                  autocomplete="off"
-                  maxlength="80"
-                  placeholder="Add a task, note, or placeholder record"
-                  required
-                >
-                <button class="button primary" type="submit">Add</button>
-              </div>
-            </form>
-
-            <ul class="item-list" id="item-list" aria-live="polite"></ul>
-          </div>
-
-          <aside class="panel" aria-labelledby="snapshot-title">
-            <p class="eyebrow">Snapshot</p>
-            <h2 id="snapshot-title">Template pieces</h2>
-            <dl class="stat-list">
-              <div>
-                <dt>Runtime</dt>
-                <dd>Browser only</dd>
-              </div>
-              <div>
-                <dt>Deploy folder</dt>
-                <dd><code>public</code></dd>
-              </div>
-              <div>
-                <dt>Styles</dt>
-                <dd><code>global.css</code></dd>
-              </div>
-              <div>
-                <dt>Script</dt>
-                <dd><code>app.js</code></dd>
-              </div>
-            </dl>
-          </aside>
-        </section>
-
-        <section class="panel settings-panel" id="settings" aria-labelledby="settings-title">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Settings</p>
-              <h2 id="settings-title">App preferences</h2>
+          <section class="panel">
+            <div class="stat-row">
+              <span>Best score</span>
+              <strong id="best-score">0</strong>
             </div>
-            <span class="save-state" id="save-state" role="status">Saved locally</span>
-          </div>
+            <p class="treat-summary" id="treat-summary">Donuts: 0 | Milk: 0 | Sprinkles: 0</p>
+          </section>
 
-          <div class="settings-grid">
-            <label class="field">
-              <span>App name</span>
-              <input id="app-name" type="text" maxlength="32" value="Cordia">
+          <section class="panel">
+            <p class="eyebrow">Map</p>
+            <ol class="level-list" id="level-list"></ol>
+          </section>
+
+          <section class="panel controls">
+            <label class="toggle">
+              <input id="mute-toggle" type="checkbox">
+              <span>Quiet mode</span>
             </label>
-
-            <label class="field">
-              <span>Theme</span>
-              <select id="theme-select">
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
-            </label>
-          </div>
-        </section>
+            <button class="reset-button" id="reset-run" type="button">Reset run</button>
+          </section>
+        </aside>
       </main>
 
       <footer class="site-footer">
         <span>Created by <a href="https://cordia.molten.bot">cordia.molten.bot</a>.</span>
-        <a href="https://molten.bot">molten.bot</a>
+        <a href="/release.json">Release marker</a>
       </footer>
     </div>
   </body>
